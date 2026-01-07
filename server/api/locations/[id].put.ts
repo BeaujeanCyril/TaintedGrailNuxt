@@ -36,18 +36,49 @@ export default defineEventHandler(async (event) => {
     }
   }
 
+  // Mise a jour du lieu
   const location = await prisma.location.update({
     where: { id },
     data: {
       number: body.number ?? existing.number,
       name: body.name ?? existing.name,
-      dreammare: body.dreammare !== undefined ? body.dreammare : existing.dreammare,
+      dream: body.dream !== undefined ? body.dream : existing.dream,
+      nightmare: body.nightmare !== undefined ? body.nightmare : existing.nightmare,
       hasMenhir: body.hasMenhir !== undefined ? body.hasMenhir : existing.hasMenhir,
-      entries: body.entries !== undefined ? body.entries : existing.entries,
-      status: body.status !== undefined ? body.status : existing.status,
+      menhirNote: body.menhirNote !== undefined ? body.menhirNote : existing.menhirNote,
       notes: body.notes !== undefined ? body.notes : existing.notes
     }
   })
 
-  return location
+  // Mise a jour des entrees si fournies
+  if (body.entries !== undefined) {
+    // Supprimer les anciennes entrees
+    await prisma.entry.deleteMany({
+      where: { locationId: id }
+    })
+
+    // Creer les nouvelles entrees
+    if (body.entries?.length) {
+      await prisma.entry.createMany({
+        data: body.entries.map((e: { number: number, info?: string, status?: string }) => ({
+          locationId: id,
+          number: e.number,
+          info: e.info || null,
+          status: e.status || null
+        }))
+      })
+    }
+  }
+
+  // Retourner le lieu avec ses entrees
+  const result = await prisma.location.findUnique({
+    where: { id },
+    include: {
+      entries: {
+        orderBy: { number: 'asc' }
+      }
+    }
+  })
+
+  return result
 })

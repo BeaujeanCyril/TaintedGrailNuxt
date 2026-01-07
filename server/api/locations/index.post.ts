@@ -26,11 +26,23 @@ export default defineEventHandler(async (event) => {
     data: {
       number: body.number,
       name: body.name,
-      dreammare: body.dreammare || null,
+      dream: body.dream || null,
+      nightmare: body.nightmare || null,
       hasMenhir: body.hasMenhir || false,
-      entries: body.entries || null,
-      status: body.status || null,
-      notes: body.notes || null
+      menhirNote: body.menhirNote || null,
+      notes: body.notes || null,
+      entries: body.entries?.length ? {
+        create: body.entries.map((e: { number: number, info?: string, status?: string }) => ({
+          number: e.number,
+          info: e.info || null,
+          status: e.status || null
+        }))
+      } : undefined
+    },
+    include: {
+      entries: {
+        orderBy: { number: 'asc' }
+      }
     }
   })
 
