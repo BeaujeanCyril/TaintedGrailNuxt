@@ -1,61 +1,27 @@
 <script setup lang="ts">
-interface Entry {
-  id?: number
-  number: number
-  info: string
-  status: 'explored' | 'partial' | 'unknown' | null
-}
-
-interface Location {
+interface Campaign {
   id: number
-  number: number
   name: string
-  dream: string | null
-  nightmare: string | null
-  hasMenhir: boolean
-  menhirNote: string | null
-  entries: Entry[]
-  notes: string | null
+  createdAt: string
+  updatedAt: string
+  _count: {
+    locations: number
+  }
 }
 
-const locations = ref<Location[]>([])
+const campaigns = ref<Campaign[]>([])
 const loading = ref(true)
 const showModal = ref(false)
-const editingLocation = ref<Location | null>(null)
-const deleteConfirm = ref<Location | null>(null)
-const searchQuery = ref('')
-
-// Form data
-const form = ref({
-  number: 0,
-  name: '',
-  dream: '',
-  nightmare: '',
-  hasMenhir: false,
-  menhirNote: '',
-  entries: [] as Entry[],
-  notes: ''
-})
-
+const editingCampaign = ref<Campaign | null>(null)
+const deleteConfirm = ref<Campaign | null>(null)
+const newCampaignName = ref('')
 const formError = ref('')
 
-// Locations filtrees par recherche
-const filteredLocations = computed(() => {
-  if (!searchQuery.value.trim()) {
-    return locations.value
-  }
-  const query = searchQuery.value.trim().toLowerCase()
-  return locations.value.filter(loc =>
-    loc.number.toString().includes(query) ||
-    loc.name.toLowerCase().includes(query)
-  )
-})
-
-// Charger les lieux
-async function loadLocations() {
+// Charger les campagnes
+async function loadCampaigns() {
   loading.value = true
   try {
-    locations.value = await $fetch<Location[]>('/api/locations')
+    campaigns.value = await $fetch<Campaign[]>('/api/campaigns')
   } catch (e) {
     console.error('Erreur chargement:', e)
   } finally {
@@ -65,148 +31,90 @@ async function loadLocations() {
 
 // Ouvrir le modal pour creer
 function openCreateModal() {
-  editingLocation.value = null
-  form.value = {
-    number: 0,
-    name: '',
-    dream: '',
-    nightmare: '',
-    hasMenhir: false,
-    menhirNote: '',
-    entries: [],
-    notes: ''
-  }
+  editingCampaign.value = null
+  newCampaignName.value = ''
   formError.value = ''
   showModal.value = true
 }
 
 // Ouvrir le modal pour editer
-function openEditModal(location: Location) {
-  editingLocation.value = location
-  form.value = {
-    number: location.number,
-    name: location.name,
-    dream: location.dream || '',
-    nightmare: location.nightmare || '',
-    hasMenhir: location.hasMenhir,
-    menhirNote: location.menhirNote || '',
-    entries: location.entries.map(e => ({
-      id: e.id,
-      number: e.number,
-      info: e.info || '',
-      status: e.status
-    })),
-    notes: location.notes || ''
-  }
+function openEditModal(campaign: Campaign, event: Event) {
+  event.stopPropagation()
+  editingCampaign.value = campaign
+  newCampaignName.value = campaign.name
   formError.value = ''
   showModal.value = true
 }
 
-// Ajouter une entree au formulaire
-function addEntry() {
-  form.value.entries.push({
-    number: 0,
-    info: '',
-    status: null
-  })
-}
-
-// Supprimer une entree du formulaire
-function removeEntry(index: number) {
-  form.value.entries.splice(index, 1)
-}
-
 // Sauvegarder (creer ou modifier)
-async function saveLocation() {
+async function saveCampaign() {
   formError.value = ''
 
-  if (!form.value.number || !form.value.name.trim()) {
-    formError.value = 'Le numero et le nom sont requis'
-    return
-  }
-
-  // Verifier que toutes les entrees ont un numero
-  const invalidEntry = form.value.entries.find(e => !e.number)
-  if (invalidEntry) {
-    formError.value = 'Toutes les entrees doivent avoir un numero'
+  if (!newCampaignName.value.trim()) {
+    formError.value = 'Le nom est requis'
     return
   }
 
   try {
-    const data = {
-      number: form.value.number,
-      name: form.value.name.trim(),
-      dream: form.value.dream.trim() || null,
-      nightmare: form.value.nightmare.trim() || null,
-      hasMenhir: form.value.hasMenhir,
-      menhirNote: form.value.hasMenhir ? (form.value.menhirNote.trim() || null) : null,
-      entries: form.value.entries.map(e => ({
-        number: e.number,
-        info: e.info?.trim() || null,
-        status: e.status
-      })),
-      notes: form.value.notes.trim() || null
-    }
-
-    if (editingLocation.value) {
-      await $fetch(`/api/locations/${editingLocation.value.id}`, {
+    if (editingCampaign.value) {
+      await $fetch(`/api/campaigns/${editingCampaign.value.id}`, {
         method: 'PUT',
-        body: data
+        body: { name: newCampaignName.value.trim() }
       })
     } else {
-      await $fetch('/api/locations', {
+      const newCampaign = await $fetch<Campaign>('/api/campaigns', {
         method: 'POST',
-        body: data
+        body: { name: newCampaignName.value.trim() }
       })
+      // Rediriger vers la nouvelle campagne
+      navigateTo(`/campaigns/${newCampaign.id}`)
+      return
     }
 
     showModal.value = false
-    await loadLocations()
+    await loadCampaigns()
   } catch (e: any) {
     formError.value = e.data?.statusMessage || 'Erreur lors de la sauvegarde'
   }
 }
 
-// Supprimer un lieu
-async function deleteLocation() {
+// Confirmer suppression
+function confirmDelete(campaign: Campaign, event: Event) {
+  event.stopPropagation()
+  deleteConfirm.value = campaign
+}
+
+// Supprimer une campagne
+async function deleteCampaign() {
   if (!deleteConfirm.value) return
 
   try {
-    await $fetch(`/api/locations/${deleteConfirm.value.id}`, {
+    await $fetch(`/api/campaigns/${deleteConfirm.value.id}`, {
       method: 'DELETE'
     })
     deleteConfirm.value = null
-    await loadLocations()
+    await loadCampaigns()
   } catch (e: any) {
     console.error('Erreur suppression:', e)
   }
 }
 
-// Status badge color
-function getStatusColor(status: string | null) {
-  switch (status) {
-    case 'explored': return 'bg-green-600'
-    case 'partial': return 'bg-yellow-600'
-    case 'unknown': return 'bg-gray-600'
-    default: return 'bg-gray-700'
-  }
+// Naviguer vers une campagne
+function goToCampaign(campaign: Campaign) {
+  navigateTo(`/campaigns/${campaign.id}`)
 }
 
-function getStatusLabel(status: string | null) {
-  switch (status) {
-    case 'explored': return 'Explore'
-    case 'partial': return 'Partiel'
-    case 'unknown': return 'Inconnu'
-    default: return '-'
-  }
+// Format date
+function formatDate(dateStr: string) {
+  const date = new Date(dateStr)
+  return date.toLocaleDateString('fr-FR', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric'
+  })
 }
 
-// Compter les entrees explorees
-function getExploredCount(entries: Entry[]) {
-  return entries.filter(e => e.status === 'explored').length
-}
-
-onMounted(loadLocations)
+onMounted(loadCampaigns)
 </script>
 
 <template>
@@ -217,23 +125,23 @@ onMounted(loadLocations)
         <div class="flex items-center justify-between">
           <div>
             <h1 class="text-3xl font-bold text-amber-400">Tainted Grail</h1>
-            <p class="text-stone-400 mt-1">Gestion des Lieux</p>
+            <p class="text-stone-400 mt-1">Choisissez une campagne</p>
           </div>
-          <button
-              @click="openCreateModal"
-              class="px-6 py-3 bg-amber-600 hover:bg-amber-500 rounded-lg font-semibold transition-colors flex items-center gap-2"
+          <a
+              href="https://portal.cyriongames.fr"
+              class="px-4 py-2 text-sm text-stone-400 hover:text-white hover:bg-stone-700 rounded-lg transition-colors flex items-center gap-2"
           >
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
             </svg>
-            Nouveau Lieu
-          </button>
+            Retour au portail
+          </a>
         </div>
       </div>
     </header>
 
     <!-- Content -->
-    <main class="container mx-auto px-4 py-8">
+    <main class="container mx-auto px-4 py-12">
       <!-- Loading -->
       <div v-if="loading" class="flex justify-center py-12">
         <svg class="animate-spin h-10 w-10 text-amber-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -243,281 +151,132 @@ onMounted(loadLocations)
       </div>
 
       <template v-else>
-        <!-- Search bar -->
-        <div class="mb-6">
-          <div class="relative max-w-md">
-            <svg class="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-stone-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+        <!-- Create campaign button -->
+        <div class="text-center mb-8">
+          <button
+              @click="openCreateModal"
+              class="px-8 py-4 bg-amber-600 hover:bg-amber-500 rounded-xl font-semibold transition-colors inline-flex items-center gap-3 text-lg"
+          >
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
             </svg>
-            <input
-                v-model="searchQuery"
-                type="text"
-                placeholder="Rechercher par numero ou nom..."
-                class="w-full pl-12 pr-4 py-3 bg-stone-800 border border-stone-700 rounded-lg focus:border-amber-500 focus:outline-none"
-            />
-          </div>
+            Nouvelle Campagne
+          </button>
         </div>
 
         <!-- Empty state -->
-        <div v-if="locations.length === 0" class="text-center py-16">
-          <svg class="w-16 h-16 mx-auto text-stone-600 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+        <div v-if="campaigns.length === 0" class="text-center py-16">
+          <svg class="w-20 h-20 mx-auto text-stone-600 mb-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
           </svg>
-          <p class="text-stone-400 text-lg">Aucun lieu enregistre</p>
-          <p class="text-stone-500 mt-2">Commencez par ajouter votre premier lieu</p>
+          <p class="text-stone-400 text-xl">Aucune campagne</p>
+          <p class="text-stone-500 mt-2">Creez votre premiere campagne pour commencer</p>
         </div>
 
-        <!-- No results -->
-        <div v-else-if="filteredLocations.length === 0" class="text-center py-16">
-          <p class="text-stone-400 text-lg">Aucun lieu trouve pour "{{ searchQuery }}"</p>
-        </div>
-
-        <!-- Locations Table -->
-        <div v-else class="bg-stone-800/60 rounded-xl border border-stone-700 overflow-hidden">
-          <table class="w-full">
-            <thead class="bg-stone-700/50">
-              <tr>
-                <th class="px-4 py-3 text-left text-sm font-semibold text-stone-300 w-20">#</th>
-                <th class="px-4 py-3 text-left text-sm font-semibold text-stone-300">Nom</th>
-                <th class="px-4 py-3 text-left text-sm font-semibold text-stone-300 w-32">Entrees</th>
-                <th class="px-4 py-3 text-left text-sm font-semibold text-stone-300 w-24">Menhir</th>
-                <th class="px-4 py-3 text-left text-sm font-semibold text-stone-300 w-24">Reve</th>
-                <th class="px-4 py-3 text-left text-sm font-semibold text-stone-300 w-24">Cauchemar</th>
-                <th class="px-4 py-3 text-right text-sm font-semibold text-stone-300 w-28">Actions</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-stone-700">
-              <tr
-                  v-for="location in filteredLocations"
-                  :key="location.id"
-                  class="hover:bg-stone-700/30 transition-colors"
+        <!-- Campaigns grid -->
+        <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-5xl mx-auto">
+          <button
+              v-for="campaign in campaigns"
+              :key="campaign.id"
+              @click="goToCampaign(campaign)"
+              class="group relative bg-stone-800/60 hover:bg-stone-700/60 border border-stone-700 hover:border-amber-500/50 rounded-2xl p-6 text-left transition-all duration-200"
+          >
+            <!-- Actions -->
+            <div class="absolute top-4 right-4 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+              <button
+                  @click="openEditModal(campaign, $event)"
+                  class="p-2 text-stone-400 hover:text-amber-400 hover:bg-stone-600 rounded-lg transition-colors"
+                  title="Renommer"
               >
-                <td class="px-4 py-3">
-                  <span class="text-lg font-bold text-amber-400">#{{ location.number }}</span>
-                </td>
-                <td class="px-4 py-3">
-                  <span class="font-medium">{{ location.name }}</span>
-                  <p v-if="location.notes" class="text-xs text-stone-500 mt-1 truncate max-w-xs">{{ location.notes }}</p>
-                </td>
-                <td class="px-4 py-3">
-                  <span v-if="location.entries.length" class="px-2 py-1 rounded text-xs font-medium bg-stone-600">
-                    {{ getExploredCount(location.entries) }}/{{ location.entries.length }}
-                  </span>
-                  <span v-else class="text-stone-500 text-sm">-</span>
-                </td>
-                <td class="px-4 py-3">
-                  <span v-if="location.hasMenhir" class="text-emerald-400" title="Menhir present">✓</span>
-                  <span v-else class="text-stone-600">-</span>
-                </td>
-                <td class="px-4 py-3">
-                  <span v-if="location.dream" class="text-blue-400" title="Reve">✓</span>
-                  <span v-else class="text-stone-600">-</span>
-                </td>
-                <td class="px-4 py-3">
-                  <span v-if="location.nightmare" class="text-purple-400" title="Cauchemar">✓</span>
-                  <span v-else class="text-stone-600">-</span>
-                </td>
-                <td class="px-4 py-3 text-right">
-                  <div class="flex gap-1 justify-end">
-                    <button
-                        @click="openEditModal(location)"
-                        class="p-2 text-stone-400 hover:text-amber-400 hover:bg-stone-700 rounded-lg transition-colors"
-                        title="Modifier"
-                    >
-                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                      </svg>
-                    </button>
-                    <button
-                        @click="deleteConfirm = location"
-                        class="p-2 text-stone-400 hover:text-red-400 hover:bg-stone-700 rounded-lg transition-colors"
-                        title="Supprimer"
-                    >
-                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                      </svg>
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
+              </button>
+              <button
+                  @click="confirmDelete(campaign, $event)"
+                  class="p-2 text-stone-400 hover:text-red-400 hover:bg-stone-600 rounded-lg transition-colors"
+                  title="Supprimer"
+              >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+              </button>
+            </div>
 
-        <!-- Stats -->
-        <div v-if="locations.length" class="mt-4 text-sm text-stone-500">
-          {{ locations.length }} lieu(x) enregistre(s)
+            <!-- Icon -->
+            <div class="w-16 h-16 bg-amber-600/20 rounded-xl flex items-center justify-center mb-4">
+              <svg class="w-8 h-8 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+              </svg>
+            </div>
+
+            <!-- Name -->
+            <h2 class="text-xl font-bold text-white mb-2 group-hover:text-amber-400 transition-colors">
+              {{ campaign.name }}
+            </h2>
+
+            <!-- Stats -->
+            <div class="flex items-center gap-4 text-sm text-stone-400">
+              <span class="flex items-center gap-1">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                </svg>
+                {{ campaign._count.locations }} lieu(x)
+              </span>
+              <span class="flex items-center gap-1">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                {{ formatDate(campaign.updatedAt) }}
+              </span>
+            </div>
+
+            <!-- Arrow -->
+            <div class="absolute bottom-6 right-6 text-stone-500 group-hover:text-amber-400 transition-colors">
+              <svg class="w-6 h-6 transform group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+              </svg>
+            </div>
+          </button>
         </div>
       </template>
     </main>
 
-    <!-- Create/Edit Modal -->
+    <!-- Create/Edit Campaign Modal -->
     <Teleport to="body">
       <div
           v-if="showModal"
           class="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4"
           @click.self="showModal = false"
       >
-        <div class="bg-stone-800 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+        <div class="bg-stone-800 rounded-2xl w-full max-w-md">
           <div class="p-6 border-b border-stone-700">
             <h2 class="text-xl font-bold text-amber-400">
-              {{ editingLocation ? 'Modifier le lieu' : 'Nouveau lieu' }}
+              {{ editingCampaign ? 'Renommer la campagne' : 'Nouvelle campagne' }}
             </h2>
           </div>
 
-          <form @submit.prevent="saveLocation" class="p-6 space-y-5">
+          <form @submit.prevent="saveCampaign" class="p-6 space-y-5">
             <!-- Error -->
             <div v-if="formError" class="p-3 bg-red-900/50 border border-red-700 rounded-lg text-red-300 text-sm">
               {{ formError }}
             </div>
 
-            <!-- Number & Name -->
-            <div class="grid grid-cols-4 gap-4">
-              <div>
-                <label class="block text-sm font-medium text-stone-400 mb-2">Numero *</label>
-                <input
-                    v-model.number="form.number"
-                    type="number"
-                    min="1"
-                    class="w-full px-4 py-3 bg-stone-700 border border-stone-600 rounded-lg focus:border-amber-500 focus:outline-none"
-                    required
-                />
-              </div>
-              <div class="col-span-3">
-                <label class="block text-sm font-medium text-stone-400 mb-2">Nom *</label>
-                <input
-                    v-model="form.name"
-                    type="text"
-                    class="w-full px-4 py-3 bg-stone-700 border border-stone-600 rounded-lg focus:border-amber-500 focus:outline-none"
-                    placeholder="Nom du lieu"
-                    required
-                />
-              </div>
-            </div>
-
-            <!-- Dream / Nightmare -->
-            <div class="grid grid-cols-2 gap-4">
-              <div>
-                <label class="block text-sm font-medium text-blue-400 mb-2">Reve</label>
-                <textarea
-                    v-model="form.dream"
-                    rows="2"
-                    class="w-full px-4 py-3 bg-blue-900/20 border border-blue-800 rounded-lg focus:border-blue-500 focus:outline-none resize-none"
-                    placeholder="Information du reve..."
-                ></textarea>
-              </div>
-              <div>
-                <label class="block text-sm font-medium text-purple-400 mb-2">Cauchemar</label>
-                <textarea
-                    v-model="form.nightmare"
-                    rows="2"
-                    class="w-full px-4 py-3 bg-purple-900/20 border border-purple-800 rounded-lg focus:border-purple-500 focus:outline-none resize-none"
-                    placeholder="Information du cauchemar..."
-                ></textarea>
-              </div>
-            </div>
-
-            <!-- Menhir -->
-            <div class="space-y-3">
-              <label class="flex items-center gap-3 cursor-pointer">
-                <input
-                    v-model="form.hasMenhir"
-                    type="checkbox"
-                    class="w-5 h-5 rounded text-emerald-600 bg-stone-700 border-stone-600"
-                />
-                <span>Presence d'un Menhir</span>
-              </label>
-              <div v-if="form.hasMenhir">
-                <input
-                    v-model="form.menhirNote"
-                    type="text"
-                    class="w-full px-4 py-3 bg-emerald-900/20 border border-emerald-800 rounded-lg focus:border-emerald-500 focus:outline-none"
-                    placeholder="Note sur le menhir..."
-                />
-              </div>
-            </div>
-
-            <!-- Entries -->
-            <div class="space-y-3">
-              <div class="flex items-center justify-between">
-                <label class="text-sm font-medium text-stone-400">Entrees</label>
-                <button
-                    type="button"
-                    @click="addEntry"
-                    class="px-3 py-1 text-sm bg-stone-700 hover:bg-stone-600 rounded-lg transition-colors flex items-center gap-1"
-                >
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-                  </svg>
-                  Ajouter
-                </button>
-              </div>
-
-              <div v-if="form.entries.length === 0" class="text-center py-4 text-stone-500 text-sm bg-stone-700/30 rounded-lg">
-                Aucune entree. Cliquez sur "Ajouter" pour en creer une.
-              </div>
-
-              <div v-for="(entry, index) in form.entries" :key="index" class="bg-stone-700/50 rounded-lg p-4 space-y-3">
-                <div class="flex items-center gap-3">
-                  <div class="w-24">
-                    <label class="block text-xs text-stone-500 mb-1">Numero</label>
-                    <input
-                        v-model.number="entry.number"
-                        type="number"
-                        min="1"
-                        class="w-full px-3 py-2 bg-stone-700 border border-stone-600 rounded-lg focus:border-amber-500 focus:outline-none text-sm"
-                        placeholder="#"
-                    />
-                  </div>
-                  <div class="flex-1">
-                    <label class="block text-xs text-stone-500 mb-1">Status</label>
-                    <select
-                        v-model="entry.status"
-                        class="w-full px-3 py-2 bg-stone-700 border border-stone-600 rounded-lg focus:border-amber-500 focus:outline-none text-sm"
-                    >
-                      <option :value="null">Non defini</option>
-                      <option value="explored">Explore</option>
-                      <option value="partial">Partiel</option>
-                      <option value="unknown">Inconnu</option>
-                    </select>
-                  </div>
-                  <button
-                      type="button"
-                      @click="removeEntry(index)"
-                      class="mt-5 p-2 text-red-400 hover:bg-red-900/30 rounded-lg transition-colors"
-                      title="Supprimer"
-                  >
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                </div>
-                <div>
-                  <label class="block text-xs text-stone-500 mb-1">Information</label>
-                  <input
-                      v-model="entry.info"
-                      type="text"
-                      class="w-full px-3 py-2 bg-stone-700 border border-stone-600 rounded-lg focus:border-amber-500 focus:outline-none text-sm"
-                      placeholder="Description de l'entree..."
-                  />
-                </div>
-              </div>
-            </div>
-
-            <!-- Notes -->
+            <!-- Name -->
             <div>
-              <label class="block text-sm font-medium text-stone-400 mb-2">Notes</label>
-              <textarea
-                  v-model="form.notes"
-                  rows="3"
-                  class="w-full px-4 py-3 bg-stone-700 border border-stone-600 rounded-lg focus:border-amber-500 focus:outline-none resize-none"
-                  placeholder="Notes sur ce lieu..."
-              ></textarea>
+              <label class="block text-sm font-medium text-stone-400 mb-2">Nom de la campagne *</label>
+              <input
+                  v-model="newCampaignName"
+                  type="text"
+                  class="w-full px-4 py-3 bg-stone-700 border border-stone-600 rounded-lg focus:border-amber-500 focus:outline-none"
+                  placeholder="Ex: Premiere aventure"
+                  required
+                  autofocus
+              />
             </div>
 
             <!-- Actions -->
-            <div class="flex gap-3 pt-4">
+            <div class="flex gap-3 pt-2">
               <button
                   type="button"
                   @click="showModal = false"
@@ -529,7 +288,7 @@ onMounted(loadLocations)
                   type="submit"
                   class="flex-1 px-6 py-3 bg-amber-600 hover:bg-amber-500 rounded-lg font-semibold transition-colors"
               >
-                {{ editingLocation ? 'Modifier' : 'Creer' }}
+                {{ editingCampaign ? 'Renommer' : 'Creer' }}
               </button>
             </div>
           </form>
@@ -545,10 +304,13 @@ onMounted(loadLocations)
           @click.self="deleteConfirm = null"
       >
         <div class="bg-stone-800 rounded-2xl w-full max-w-md p-6">
-          <h2 class="text-xl font-bold text-red-400 mb-4">Supprimer ce lieu ?</h2>
-          <p class="text-stone-300 mb-6">
+          <h2 class="text-xl font-bold text-red-400 mb-4">Supprimer cette campagne ?</h2>
+          <p class="text-stone-300 mb-2">
             Etes-vous sur de vouloir supprimer
-            <span class="font-semibold text-amber-400">#{{ deleteConfirm.number }} - {{ deleteConfirm.name }}</span> ?
+            <span class="font-semibold text-amber-400">{{ deleteConfirm.name }}</span> ?
+          </p>
+          <p class="text-stone-400 text-sm mb-6">
+            Tous les lieux et entrees associes seront egalement supprimes.
             Cette action est irreversible.
           </p>
           <div class="flex gap-3">
@@ -559,7 +321,7 @@ onMounted(loadLocations)
               Annuler
             </button>
             <button
-                @click="deleteLocation"
+                @click="deleteCampaign"
                 class="flex-1 px-6 py-3 bg-red-600 hover:bg-red-500 rounded-lg font-semibold transition-colors"
             >
               Supprimer

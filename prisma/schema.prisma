@@ -7,9 +7,17 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model Campaign {
+  id          Int        @id @default(autoincrement())
+  name        String
+  locations   Location[]
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+}
+
 model Location {
   id          Int       @id @default(autoincrement())
-  number      Int       @unique
+  number      Int
   name        String
   dream       String?   // Texte pour le Reve
   nightmare   String?   // Texte pour le Cauchemar
@@ -17,8 +25,12 @@ model Location {
   menhirNote  String?   // Annotation sur le menhir
   notes       String?
   entries     Entry[]   // Relation vers les entrees
+  campaignId  Int
+  campaign    Campaign  @relation(fields: [campaignId], references: [id], onDelete: Cascade)
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
+
+  @@unique([campaignId, number])
 }
 
 model Entry {
