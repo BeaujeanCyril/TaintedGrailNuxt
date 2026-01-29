@@ -9,12 +9,27 @@
 - **Port de l'application**: 3004
 - **Process manager**: PM2 (nom: `taintedgrail`)
 
-### Commande de déploiement
+### Commande de déploiement (sur le serveur)
 ```bash
 cd /home/ubuntu/apps/taintedgrail && git pull && npm install && npx prisma generate && npx prisma db push && npm run build && ln -sf ../../public .output/server/chunks/public && pm2 restart taintedgrail
 ```
 
 **Note**: Le symlink `ln -sf ../../public .output/server/chunks/public` est nécessaire après chaque build pour que Nitro serve correctement les fichiers statiques.
+
+### Connexion SSH autonome (depuis Windows)
+
+Utiliser PowerShell avec plink (PuTTY) pour échapper correctement les `$$` du mot de passe :
+
+```powershell
+powershell -Command '& "C:\Program Files\Putty\plink.exe" -batch -pw "FT69rkqznj`$`$" ubuntu@37.59.120.247 "<commandes>"'
+```
+
+**Déploiement complet en une commande** :
+```powershell
+powershell -Command '& "C:\Program Files\Putty\plink.exe" -batch -pw "FT69rkqznj`$`$" ubuntu@37.59.120.247 "cd /home/ubuntu/apps/taintedgrail && git pull && npm install && npx prisma generate && npx prisma db push && npm run build && ln -sf ../../public .output/server/chunks/public && pm2 restart taintedgrail"'
+```
+
+**Note**: Les backticks (`` ` ``) sont nécessaires pour échapper les `$` dans PowerShell.
 
 ## Base de données
 
