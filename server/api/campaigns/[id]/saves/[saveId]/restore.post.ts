@@ -31,7 +31,8 @@ export default defineEventHandler(async (event) => {
         magic: savedChar.magic,
         energy: savedChar.energy,
         health: savedChar.health,
-        terror: savedChar.terror
+        terror: savedChar.terror,
+        locationNumber: savedChar.locationNumber
       }
     })
   }
