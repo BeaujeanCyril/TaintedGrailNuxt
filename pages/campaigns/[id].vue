@@ -38,6 +38,14 @@ interface Campaign {
   characters: Character[]
 }
 
+interface StatusItem {
+  id: number
+  name: string
+  checkboxCount: number
+  checkedBoxes: string
+  campaignStatusId: number | null
+}
+
 const route = useRoute()
 const campaignId = computed(() => parseInt(route.params.id as string))
 
@@ -80,6 +88,11 @@ const CHARACTER_DEFAULTS: Record<string, { energy: number; health: number }> = {
 }
 
 const AVAILABLE_CHARACTERS = ['Iunis', 'Gerdwyn', 'Elgan', 'Osbert']
+
+// Status management
+const showStatusModal = ref(false)
+const statuses = ref<StatusItem[]>([])
+const statusLoading = ref(false)
 
 // Personnages disponibles (non encore dans la campagne)
 const availableCharacterTypes = computed(() => {
@@ -330,6 +343,52 @@ function getCharacterColor(type: string) {
   }
 }
 
+// === Status Management ===
+
+async function openStatusModal() {
+  showStatusModal.value = true
+  await loadStatuses()
+}
+
+async function loadStatuses() {
+  statusLoading.value = true
+  try {
+    statuses.value = await $fetch<StatusItem[]>(`/api/campaigns/${campaignId.value}/statuses`)
+  } catch (e) {
+    console.error('Erreur chargement statuts:', e)
+  } finally {
+    statusLoading.value = false
+  }
+}
+
+function isBoxChecked(status: StatusItem, boxNumber: number): boolean {
+  if (!status.checkedBoxes) return false
+  const checked = status.checkedBoxes.split(',').map(Number)
+  return checked.includes(boxNumber)
+}
+
+async function toggleStatusBox(status: StatusItem, boxNumber: number) {
+  const checked = status.checkedBoxes ? status.checkedBoxes.split(',').map(Number).filter(n => n > 0) : []
+
+  let newChecked: number[]
+  if (checked.includes(boxNumber)) {
+    newChecked = checked.filter(n => n !== boxNumber)
+  } else {
+    newChecked = [...checked, boxNumber].sort((a, b) => a - b)
+  }
+
+  try {
+    await $fetch(`/api/campaigns/${campaignId.value}/statuses/${status.id}`, {
+      method: 'PUT',
+      body: { checkedBoxes: newChecked.join(',') }
+    })
+    // Mettre a jour localement
+    status.checkedBoxes = newChecked.join(',')
+  } catch (e) {
+    console.error('Erreur mise a jour statut:', e)
+  }
+}
+
 onMounted(loadCampaign)
 </script>
 
@@ -352,15 +411,26 @@ onMounted(loadCampaign)
             <h1 class="text-3xl font-bold text-amber-400">{{ campaign?.name || 'Chargement...' }}</h1>
             <p class="text-stone-400 mt-1">Gestion des Lieux</p>
           </div>
-          <button
-              @click="openCreateModal"
-              class="px-6 py-3 bg-amber-600 hover:bg-amber-500 rounded-lg font-semibold transition-colors flex items-center gap-2"
-          >
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-            </svg>
-            Nouveau Lieu
-          </button>
+          <div class="flex gap-3">
+            <button
+                @click="openStatusModal"
+                class="px-4 py-3 bg-purple-600 hover:bg-purple-500 rounded-lg font-semibold transition-colors flex items-center gap-2"
+            >
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+              </svg>
+              Statuts
+            </button>
+            <button
+                @click="openCreateModal"
+                class="px-6 py-3 bg-amber-600 hover:bg-amber-500 rounded-lg font-semibold transition-colors flex items-center gap-2"
+            >
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+              </svg>
+              Nouveau Lieu
+            </button>
+          </div>
         </div>
       </div>
     </header>
@@ -939,6 +1009,90 @@ onMounted(loadCampaign)
             >
               Supprimer
             </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- Status Modal -->
+    <Teleport to="body">
+      <div
+          v-if="showStatusModal"
+          class="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4"
+          @click.self="showStatusModal = false"
+      >
+        <div class="bg-stone-800 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+          <div class="p-6 border-b border-stone-700 flex items-center justify-between">
+            <h2 class="text-xl font-bold text-purple-400 flex items-center gap-2">
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+              </svg>
+              Statuts de la campagne
+            </h2>
+            <button
+                @click="showStatusModal = false"
+                class="p-2 text-stone-400 hover:text-white hover:bg-stone-700 rounded-lg transition-colors"
+            >
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+
+          <div class="p-6">
+            <!-- Loading -->
+            <div v-if="statusLoading" class="flex justify-center py-8">
+              <svg class="animate-spin h-8 w-8 text-purple-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+            </div>
+
+            <!-- Empty state -->
+            <div v-else-if="statuses.length === 0" class="text-center py-8 text-stone-400">
+              Aucun statut disponible
+            </div>
+
+            <!-- Status table -->
+            <table v-else class="w-full">
+              <thead>
+                <tr class="border-b border-stone-700">
+                  <th class="text-left py-3 px-4 text-stone-400 font-medium">Nom du statut</th>
+                  <th class="text-left py-3 px-4 text-stone-400 font-medium">Progression</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr
+                    v-for="status in statuses"
+                    :key="status.id"
+                    class="border-b border-stone-700/50 hover:bg-stone-700/30"
+                >
+                  <td class="py-4 px-4">
+                    <span class="font-medium text-white">{{ status.name }}</span>
+                  </td>
+                  <td class="py-4 px-4">
+                    <div class="flex items-center gap-2 flex-wrap">
+                      <button
+                          v-for="n in status.checkboxCount"
+                          :key="n"
+                          @click="toggleStatusBox(status, n)"
+                          class="w-8 h-8 rounded border-2 flex items-center justify-center transition-all"
+                          :class="isBoxChecked(status, n)
+                            ? 'bg-purple-600 border-purple-500 text-white'
+                            : 'bg-stone-700 border-stone-600 text-stone-500 hover:border-purple-500'"
+                      >
+                        <span v-if="isBoxChecked(status, n)">
+                          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" />
+                          </svg>
+                        </span>
+                        <span v-else class="text-xs">{{ n }}</span>
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         </div>
       </div>
