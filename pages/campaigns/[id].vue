@@ -29,6 +29,28 @@ interface Character {
   energy: number
   health: number
   terror: number
+  locationNumber: number | null
+}
+
+interface SaveCharacter {
+  id: number
+  characterType: string
+  playerName: string
+  food: number
+  wealth: number
+  experience: number
+  magic: number
+  energy: number
+  health: number
+  terror: number
+  locationNumber: number | null
+}
+
+interface Save {
+  id: number
+  name: string
+  createdAt: string
+  characters: SaveCharacter[]
 }
 
 interface Campaign {
@@ -95,6 +117,14 @@ const showStatusModal = ref(false)
 const statuses = ref<StatusItem[]>([])
 const statusLoading = ref(false)
 const statusSearchQuery = ref('')
+
+// Save management
+const showSaveModal = ref(false)
+const saves = ref<Save[]>([])
+const savesLoading = ref(false)
+const newSaveName = ref('')
+const saveError = ref('')
+const deleteSaveConfirm = ref<Save | null>(null)
 
 // Statuts filtres par recherche intelligente
 const filteredStatuses = computed(() => {
@@ -337,6 +367,21 @@ async function updateCharacterStat(character: Character, stat: string, delta: nu
   }
 }
 
+async function updateCharacterLocation(character: Character, event: Event) {
+  const input = event.target as HTMLInputElement
+  const value = input.value ? parseInt(input.value) : null
+
+  try {
+    await $fetch(`/api/campaigns/${campaignId.value}/characters/${character.id}`, {
+      method: 'PUT',
+      body: { locationNumber: value }
+    })
+    await loadCampaign()
+  } catch (e) {
+    console.error('Erreur mise a jour lieu:', e)
+  }
+}
+
 async function deleteCharacter() {
   if (!deleteCharacterConfirm.value) return
 
@@ -408,6 +453,106 @@ async function toggleStatusBox(status: StatusItem, boxNumber: number) {
   }
 }
 
+// === Save Management ===
+
+async function openSaveModal() {
+  showSaveModal.value = true
+  newSaveName.value = ''
+  saveError.value = ''
+  await loadSaves()
+}
+
+async function loadSaves() {
+  savesLoading.value = true
+  try {
+    saves.value = await $fetch<Save[]>(`/api/campaigns/${campaignId.value}/saves`)
+  } catch (e) {
+    console.error('Erreur chargement sauvegardes:', e)
+  } finally {
+    savesLoading.value = false
+  }
+}
+
+async function createSave() {
+  saveError.value = ''
+
+  if (!newSaveName.value.trim()) {
+    saveError.value = 'Entrez un nom pour la sauvegarde'
+    return
+  }
+
+  if (!campaign.value?.characters.length) {
+    saveError.value = 'Aucun personnage a sauvegarder'
+    return
+  }
+
+  try {
+    await $fetch(`/api/campaigns/${campaignId.value}/saves`, {
+      method: 'POST',
+      body: {
+        name: newSaveName.value.trim(),
+        characters: campaign.value.characters.map((char: Character) => ({
+          characterType: char.characterType,
+          playerName: char.playerName,
+          food: char.food,
+          wealth: char.wealth,
+          experience: char.experience,
+          magic: char.magic,
+          energy: char.energy,
+          health: char.health,
+          terror: char.terror,
+          locationNumber: char.locationNumber
+        }))
+      }
+    })
+    newSaveName.value = ''
+    await loadSaves()
+  } catch (e: unknown) {
+    const error = e as { data?: { statusMessage?: string } }
+    saveError.value = error.data?.statusMessage || 'Erreur lors de la sauvegarde'
+  }
+}
+
+async function restoreSave(save: Save) {
+  if (!confirm(`Restaurer la sauvegarde "${save.name}" ? Les stats actuelles seront ecrasees.`)) {
+    return
+  }
+
+  try {
+    await $fetch(`/api/campaigns/${campaignId.value}/saves/${save.id}/restore`, {
+      method: 'POST'
+    })
+    showSaveModal.value = false
+    await loadCampaign()
+  } catch (e) {
+    console.error('Erreur restauration:', e)
+  }
+}
+
+async function deleteSave() {
+  if (!deleteSaveConfirm.value) return
+
+  try {
+    await $fetch(`/api/campaigns/${campaignId.value}/saves/${deleteSaveConfirm.value.id}`, {
+      method: 'DELETE'
+    })
+    deleteSaveConfirm.value = null
+    await loadSaves()
+  } catch (e) {
+    console.error('Erreur suppression:', e)
+  }
+}
+
+function formatDate(dateStr: string) {
+  return new Date(dateStr).toLocaleString('fr-FR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  })
+}
+
 onMounted(loadCampaign)
 </script>
 
@@ -431,6 +576,15 @@ onMounted(loadCampaign)
             <p class="text-stone-400 mt-1">Gestion des Lieux</p>
           </div>
           <div class="flex gap-3">
+            <button
+                @click="openSaveModal"
+                class="px-4 py-3 bg-emerald-600 hover:bg-emerald-500 rounded-lg font-semibold transition-colors flex items-center gap-2"
+            >
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+              </svg>
+              Sauvegardes
+            </button>
             <button
                 @click="openStatusModal"
                 class="px-4 py-3 bg-purple-600 hover:bg-purple-500 rounded-lg font-semibold transition-colors flex items-center gap-2"
@@ -599,6 +753,24 @@ onMounted(loadCampaign)
                     <button @click="updateCharacterStat(char, 'magic', 1)" class="text-white/50 hover:text-white">+</button>
                   </div>
                 </div>
+              </div>
+
+              <!-- Location -->
+              <div class="mt-2 flex items-center justify-between bg-black/20 rounded px-2 py-1">
+                <span class="text-xs text-white/70 flex items-center gap-1">
+                  <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                  </svg>
+                  Lieu
+                </span>
+                <input
+                    :value="char.locationNumber || ''"
+                    type="number"
+                    min="1"
+                    placeholder="-"
+                    class="w-12 text-center text-xs bg-black/30 border border-white/20 rounded px-1 py-0.5 text-amber-300 focus:outline-none focus:border-amber-500"
+                    @change="updateCharacterLocation(char, $event)"
+                />
               </div>
             </div>
           </div>
@@ -1171,6 +1343,163 @@ onMounted(loadCampaign)
             <div v-if="!statusLoading && statuses.length > 0" class="mt-4 text-sm text-stone-500 text-center">
               {{ filteredStatuses.length }} / {{ statuses.length }} statut(s)
             </div>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- Save Modal -->
+    <Teleport to="body">
+      <div
+          v-if="showSaveModal"
+          class="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4"
+          @click.self="showSaveModal = false"
+      >
+        <div class="bg-stone-800 rounded-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+          <!-- Header fixe -->
+          <div class="sticky top-0 bg-stone-800 rounded-t-2xl border-b border-stone-700 z-10">
+            <div class="p-6 flex items-center justify-between">
+              <h2 class="text-xl font-bold text-emerald-400 flex items-center gap-2">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+                </svg>
+                Sauvegardes
+              </h2>
+              <button
+                  @click="showSaveModal = false"
+                  class="p-2 text-stone-400 hover:text-white hover:bg-stone-700 rounded-lg transition-colors"
+              >
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <!-- Nouvelle sauvegarde -->
+            <div class="px-6 pb-4">
+              <div v-if="saveError" class="mb-3 p-3 bg-red-900/50 border border-red-700 rounded-lg text-red-300 text-sm">
+                {{ saveError }}
+              </div>
+              <div class="flex gap-2">
+                <input
+                    v-model="newSaveName"
+                    type="text"
+                    placeholder="Nom de la sauvegarde..."
+                    class="flex-1 px-4 py-3 bg-stone-700 border border-stone-600 rounded-lg focus:border-emerald-500 focus:outline-none"
+                    @keyup.enter="createSave"
+                />
+                <button
+                    @click="createSave"
+                    class="px-4 py-3 bg-emerald-600 hover:bg-emerald-500 rounded-lg font-semibold transition-colors flex items-center gap-2"
+                >
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                  </svg>
+                  Sauvegarder
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Liste des sauvegardes -->
+          <div class="flex-1 overflow-y-auto p-6">
+            <!-- Loading -->
+            <div v-if="savesLoading" class="flex justify-center py-8">
+              <svg class="animate-spin h-8 w-8 text-emerald-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+            </div>
+
+            <!-- Empty state -->
+            <div v-else-if="saves.length === 0" class="text-center py-8 text-stone-400">
+              <svg class="w-12 h-12 mx-auto mb-3 text-stone-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+              </svg>
+              Aucune sauvegarde
+            </div>
+
+            <!-- Saves list -->
+            <div v-else class="space-y-3">
+              <div
+                  v-for="save in saves"
+                  :key="save.id"
+                  class="bg-stone-700/50 rounded-xl p-4 border border-stone-600"
+              >
+                <div class="flex items-start justify-between mb-3">
+                  <div>
+                    <h3 class="font-bold text-white">{{ save.name }}</h3>
+                    <p class="text-sm text-stone-400">{{ formatDate(save.createdAt) }}</p>
+                  </div>
+                  <div class="flex gap-2">
+                    <button
+                        @click="restoreSave(save)"
+                        class="px-3 py-2 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-sm font-semibold transition-colors flex items-center gap-1"
+                        title="Restaurer"
+                    >
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      </svg>
+                      Restaurer
+                    </button>
+                    <button
+                        @click="deleteSaveConfirm = save"
+                        class="p-2 text-stone-400 hover:text-red-400 hover:bg-stone-600 rounded-lg transition-colors"
+                        title="Supprimer"
+                    >
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Characters in save -->
+                <div class="flex flex-wrap gap-2">
+                  <div
+                      v-for="char in save.characters"
+                      :key="char.id"
+                      class="px-3 py-1 bg-stone-600 rounded-lg text-sm"
+                  >
+                    <span class="font-medium">{{ char.characterType }}</span>
+                    <span class="text-stone-400 ml-1">({{ char.playerName }})</span>
+                    <span class="text-emerald-400 ml-2">E:{{ char.energy }} S:{{ char.health }} T:{{ char.terror }}</span>
+                    <span v-if="char.locationNumber" class="text-amber-400 ml-2">Lieu #{{ char.locationNumber }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- Delete Save Confirmation Modal -->
+    <Teleport to="body">
+      <div
+          v-if="deleteSaveConfirm"
+          class="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4"
+          @click.self="deleteSaveConfirm = null"
+      >
+        <div class="bg-stone-800 rounded-2xl w-full max-w-md p-6">
+          <h2 class="text-xl font-bold text-red-400 mb-4">Supprimer cette sauvegarde ?</h2>
+          <p class="text-stone-300 mb-6">
+            Etes-vous sur de vouloir supprimer la sauvegarde
+            <span class="font-semibold text-emerald-400">"{{ deleteSaveConfirm.name }}"</span> ?
+          </p>
+          <div class="flex gap-3">
+            <button
+                @click="deleteSaveConfirm = null"
+                class="flex-1 px-6 py-3 bg-stone-700 hover:bg-stone-600 rounded-lg font-semibold transition-colors"
+            >
+              Annuler
+            </button>
+            <button
+                @click="deleteSave"
+                class="flex-1 px-6 py-3 bg-red-600 hover:bg-red-500 rounded-lg font-semibold transition-colors"
+            >
+              Supprimer
+            </button>
           </div>
         </div>
       </div>

@@ -13,8 +13,43 @@ model Campaign {
   locations       Location[]
   characters      Character[]
   campaignStatuses CampaignStatus[]
+  saves           Save[]
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
+}
+
+// Sauvegardes de la campagne
+model Save {
+  id              Int              @id @default(autoincrement())
+  name            String           // Nom de la sauvegarde (ex: "Tour 5", "Avant boss")
+  campaignId      Int
+  campaign        Campaign         @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  characters      SaveCharacter[]
+  createdAt       DateTime         @default(now())
+}
+
+// Etat d'un personnage dans une sauvegarde
+model SaveCharacter {
+  id            Int       @id @default(autoincrement())
+  characterType String    // "Iunis", "Gerdwyn", "Elgan", "Osbert"
+  playerName    String
+
+  // Ressources
+  food          Int
+  wealth        Int
+  experience    Int
+  magic         Int
+
+  // Stats
+  energy        Int
+  health        Int
+  terror        Int
+
+  // Position
+  locationNumber Int?     // Numero du lieu ou se trouve le personnage
+
+  saveId        Int
+  save          Save      @relation(fields: [saveId], references: [id], onDelete: Cascade)
 }
 
 // Statuts globaux (seedes)
@@ -52,6 +87,9 @@ model Character {
   energy        Int       // Energie (valeur initiale selon personnage)
   health        Int       // Sante (valeur initiale selon personnage)
   terror        Int       @default(0)  // Terreur
+
+  // Position actuelle
+  locationNumber Int?     // Numero du lieu ou se trouve le personnage
 
   campaignId    Int
   campaign      Campaign  @relation(fields: [campaignId], references: [id], onDelete: Cascade)
