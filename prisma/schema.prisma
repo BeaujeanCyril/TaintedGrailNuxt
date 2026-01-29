@@ -8,11 +8,36 @@ datasource db {
 }
 
 model Campaign {
-  id          Int        @id @default(autoincrement())
+  id          Int         @id @default(autoincrement())
   name        String
   locations   Location[]
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
+  characters  Character[]
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+}
+
+model Character {
+  id            Int       @id @default(autoincrement())
+  characterType String    // "Iunis", "Gerdwyn", "Elgan", "Osbert"
+  playerName    String    // Prenom du joueur
+
+  // Ressources
+  food          Int       @default(0)  // Nourriture
+  wealth        Int       @default(0)  // Richesse
+  experience    Int       @default(0)  // Experience
+  magic         Int       @default(0)  // Magie
+
+  // Stats
+  energy        Int       // Energie (valeur initiale selon personnage)
+  health        Int       // Sante (valeur initiale selon personnage)
+  terror        Int       @default(0)  // Terreur
+
+  campaignId    Int
+  campaign      Campaign  @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@unique([campaignId, characterType])
 }
 
 model Location {

@@ -20,6 +20,9 @@ export default defineEventHandler(async (event) => {
           }
         },
         orderBy: { number: 'asc' }
+      },
+      characters: {
+        orderBy: { createdAt: 'asc' }
       }
     }
   })

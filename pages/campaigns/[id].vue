@@ -18,10 +18,24 @@ interface Location {
   notes: string | null
 }
 
+interface Character {
+  id: number
+  characterType: string
+  playerName: string
+  food: number
+  wealth: number
+  experience: number
+  magic: number
+  energy: number
+  health: number
+  terror: number
+}
+
 interface Campaign {
   id: number
   name: string
   locations: Location[]
+  characters: Character[]
 }
 
 const route = useRoute()
@@ -47,6 +61,32 @@ const form = ref({
 })
 
 const formError = ref('')
+
+// Character management
+const showCharacterModal = ref(false)
+const deleteCharacterConfirm = ref<Character | null>(null)
+const characterForm = ref({
+  characterType: '',
+  playerName: ''
+})
+const characterFormError = ref('')
+
+// Valeurs initiales par personnage
+const CHARACTER_DEFAULTS: Record<string, { energy: number; health: number }> = {
+  Iunis: { energy: 6, health: 9 },
+  Gerdwyn: { energy: 6, health: 8 },
+  Elgan: { energy: 6, health: 7 },
+  Osbert: { energy: 7, health: 5 }
+}
+
+const AVAILABLE_CHARACTERS = ['Iunis', 'Gerdwyn', 'Elgan', 'Osbert']
+
+// Personnages disponibles (non encore dans la campagne)
+const availableCharacterTypes = computed(() => {
+  if (!campaign.value) return AVAILABLE_CHARACTERS
+  const usedTypes = campaign.value.characters.map((c: Character) => c.characterType)
+  return AVAILABLE_CHARACTERS.filter(t => !usedTypes.includes(t))
+})
 
 // Locations filtrees par recherche
 const filteredLocations = computed(() => {
@@ -212,6 +252,84 @@ function getExploredCount(entries: Entry[]) {
   return entries.filter(e => e.status === 'explored').length
 }
 
+// === Character Management ===
+
+function openCharacterModal() {
+  characterForm.value = {
+    characterType: availableCharacterTypes.value[0] || '',
+    playerName: ''
+  }
+  characterFormError.value = ''
+  showCharacterModal.value = true
+}
+
+async function createCharacter() {
+  characterFormError.value = ''
+
+  if (!characterForm.value.characterType) {
+    characterFormError.value = 'Choisissez un personnage'
+    return
+  }
+
+  if (!characterForm.value.playerName.trim()) {
+    characterFormError.value = 'Entrez votre prenom'
+    return
+  }
+
+  try {
+    await $fetch(`/api/campaigns/${campaignId.value}/characters`, {
+      method: 'POST',
+      body: {
+        characterType: characterForm.value.characterType,
+        playerName: characterForm.value.playerName.trim()
+      }
+    })
+    showCharacterModal.value = false
+    await loadCampaign()
+  } catch (e: any) {
+    characterFormError.value = e.data?.statusMessage || 'Erreur lors de la creation'
+  }
+}
+
+async function updateCharacterStat(character: Character, stat: string, delta: number) {
+  const newValue = (character as any)[stat] + delta
+  if (newValue < 0) return
+
+  try {
+    await $fetch(`/api/campaigns/${campaignId.value}/characters/${character.id}`, {
+      method: 'PUT',
+      body: { [stat]: newValue }
+    })
+    await loadCampaign()
+  } catch (e) {
+    console.error('Erreur mise a jour:', e)
+  }
+}
+
+async function deleteCharacter() {
+  if (!deleteCharacterConfirm.value) return
+
+  try {
+    await $fetch(`/api/campaigns/${campaignId.value}/characters/${deleteCharacterConfirm.value.id}`, {
+      method: 'DELETE'
+    })
+    deleteCharacterConfirm.value = null
+    await loadCampaign()
+  } catch (e) {
+    console.error('Erreur suppression:', e)
+  }
+}
+
+function getCharacterColor(type: string) {
+  switch (type) {
+    case 'Iunis': return 'from-blue-600 to-blue-800'
+    case 'Gerdwyn': return 'from-emerald-600 to-emerald-800'
+    case 'Elgan': return 'from-purple-600 to-purple-800'
+    case 'Osbert': return 'from-orange-600 to-orange-800'
+    default: return 'from-stone-600 to-stone-800'
+  }
+}
+
 onMounted(loadCampaign)
 </script>
 
@@ -258,6 +376,134 @@ onMounted(loadCampaign)
       </div>
 
       <template v-else-if="campaign">
+        <!-- Characters Section -->
+        <div class="mb-8">
+          <div class="flex items-center justify-between mb-4">
+            <h2 class="text-xl font-bold text-amber-400 flex items-center gap-2">
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+              </svg>
+              Personnages ({{ campaign.characters.length }}/4)
+            </h2>
+            <button
+                v-if="campaign.characters.length < 4"
+                @click="openCharacterModal"
+                class="px-4 py-2 bg-amber-600 hover:bg-amber-500 rounded-lg font-semibold transition-colors flex items-center gap-2 text-sm"
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+              </svg>
+              Ajouter
+            </button>
+          </div>
+
+          <!-- No characters -->
+          <div v-if="campaign.characters.length === 0" class="text-center py-8 bg-stone-800/40 rounded-xl border border-stone-700">
+            <p class="text-stone-400">Aucun personnage dans cette campagne</p>
+            <p class="text-stone-500 text-sm mt-1">Ajoutez jusqu'a 4 personnages</p>
+          </div>
+
+          <!-- Characters grid -->
+          <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div
+                v-for="char in campaign.characters"
+                :key="char.id"
+                class="relative bg-gradient-to-br rounded-xl p-4 border border-white/10"
+                :class="getCharacterColor(char.characterType)"
+            >
+              <!-- Delete button -->
+              <button
+                  @click="deleteCharacterConfirm = char"
+                  class="absolute top-2 right-2 p-1 text-white/50 hover:text-red-400 hover:bg-black/20 rounded transition-colors"
+                  title="Supprimer"
+              >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+
+              <!-- Character info -->
+              <div class="mb-3">
+                <h3 class="font-bold text-white text-lg">{{ char.characterType }}</h3>
+                <p class="text-white/70 text-sm">{{ char.playerName }}</p>
+              </div>
+
+              <!-- Stats -->
+              <div class="space-y-2 mb-3">
+                <div class="flex items-center justify-between bg-black/20 rounded px-2 py-1">
+                  <span class="text-xs text-white/70">Energie</span>
+                  <div class="flex items-center gap-1">
+                    <button @click="updateCharacterStat(char, 'energy', -1)" class="w-5 h-5 flex items-center justify-center text-white/70 hover:text-white hover:bg-black/30 rounded">-</button>
+                    <span class="w-6 text-center font-bold text-yellow-300">{{ char.energy }}</span>
+                    <button @click="updateCharacterStat(char, 'energy', 1)" class="w-5 h-5 flex items-center justify-center text-white/70 hover:text-white hover:bg-black/30 rounded">+</button>
+                  </div>
+                </div>
+                <div class="flex items-center justify-between bg-black/20 rounded px-2 py-1">
+                  <span class="text-xs text-white/70">Sante</span>
+                  <div class="flex items-center gap-1">
+                    <button @click="updateCharacterStat(char, 'health', -1)" class="w-5 h-5 flex items-center justify-center text-white/70 hover:text-white hover:bg-black/30 rounded">-</button>
+                    <span class="w-6 text-center font-bold text-red-300">{{ char.health }}</span>
+                    <button @click="updateCharacterStat(char, 'health', 1)" class="w-5 h-5 flex items-center justify-center text-white/70 hover:text-white hover:bg-black/30 rounded">+</button>
+                  </div>
+                </div>
+                <div class="flex items-center justify-between bg-black/20 rounded px-2 py-1">
+                  <span class="text-xs text-white/70">Terreur</span>
+                  <div class="flex items-center gap-1">
+                    <button @click="updateCharacterStat(char, 'terror', -1)" class="w-5 h-5 flex items-center justify-center text-white/70 hover:text-white hover:bg-black/30 rounded">-</button>
+                    <span class="w-6 text-center font-bold text-purple-300">{{ char.terror }}</span>
+                    <button @click="updateCharacterStat(char, 'terror', 1)" class="w-5 h-5 flex items-center justify-center text-white/70 hover:text-white hover:bg-black/30 rounded">+</button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Resources -->
+              <div class="grid grid-cols-2 gap-1 text-xs">
+                <div class="flex items-center justify-between bg-black/20 rounded px-2 py-1">
+                  <span class="text-white/70">Nourr.</span>
+                  <div class="flex items-center gap-1">
+                    <button @click="updateCharacterStat(char, 'food', -1)" class="text-white/50 hover:text-white">-</button>
+                    <span class="w-4 text-center text-white">{{ char.food }}</span>
+                    <button @click="updateCharacterStat(char, 'food', 1)" class="text-white/50 hover:text-white">+</button>
+                  </div>
+                </div>
+                <div class="flex items-center justify-between bg-black/20 rounded px-2 py-1">
+                  <span class="text-white/70">Richesse</span>
+                  <div class="flex items-center gap-1">
+                    <button @click="updateCharacterStat(char, 'wealth', -1)" class="text-white/50 hover:text-white">-</button>
+                    <span class="w-4 text-center text-white">{{ char.wealth }}</span>
+                    <button @click="updateCharacterStat(char, 'wealth', 1)" class="text-white/50 hover:text-white">+</button>
+                  </div>
+                </div>
+                <div class="flex items-center justify-between bg-black/20 rounded px-2 py-1">
+                  <span class="text-white/70">Exp.</span>
+                  <div class="flex items-center gap-1">
+                    <button @click="updateCharacterStat(char, 'experience', -1)" class="text-white/50 hover:text-white">-</button>
+                    <span class="w-4 text-center text-white">{{ char.experience }}</span>
+                    <button @click="updateCharacterStat(char, 'experience', 1)" class="text-white/50 hover:text-white">+</button>
+                  </div>
+                </div>
+                <div class="flex items-center justify-between bg-black/20 rounded px-2 py-1">
+                  <span class="text-white/70">Magie</span>
+                  <div class="flex items-center gap-1">
+                    <button @click="updateCharacterStat(char, 'magic', -1)" class="text-white/50 hover:text-white">-</button>
+                    <span class="w-4 text-center text-white">{{ char.magic }}</span>
+                    <button @click="updateCharacterStat(char, 'magic', 1)" class="text-white/50 hover:text-white">+</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Locations Section -->
+        <h2 class="text-xl font-bold text-amber-400 mb-4 flex items-center gap-2">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+          </svg>
+          Lieux
+        </h2>
+
         <!-- Search bar -->
         <div class="mb-6">
           <div class="relative max-w-md">
@@ -581,6 +827,114 @@ onMounted(loadCampaign)
             </button>
             <button
                 @click="deleteLocation"
+                class="flex-1 px-6 py-3 bg-red-600 hover:bg-red-500 rounded-lg font-semibold transition-colors"
+            >
+              Supprimer
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- Add Character Modal -->
+    <Teleport to="body">
+      <div
+          v-if="showCharacterModal"
+          class="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4"
+          @click.self="showCharacterModal = false"
+      >
+        <div class="bg-stone-800 rounded-2xl w-full max-w-md">
+          <div class="p-6 border-b border-stone-700">
+            <h2 class="text-xl font-bold text-amber-400">Ajouter un personnage</h2>
+          </div>
+
+          <form @submit.prevent="createCharacter" class="p-6 space-y-5">
+            <div v-if="characterFormError" class="p-3 bg-red-900/50 border border-red-700 rounded-lg text-red-300 text-sm">
+              {{ characterFormError }}
+            </div>
+
+            <!-- Character type selection -->
+            <div>
+              <label class="block text-sm font-medium text-stone-400 mb-3">Personnage *</label>
+              <div class="grid grid-cols-2 gap-3">
+                <button
+                    v-for="charType in availableCharacterTypes"
+                    :key="charType"
+                    type="button"
+                    @click="characterForm.characterType = charType"
+                    class="p-4 rounded-xl border-2 transition-all text-left"
+                    :class="characterForm.characterType === charType
+                      ? 'border-amber-500 bg-amber-500/20'
+                      : 'border-stone-600 hover:border-stone-500 bg-stone-700/50'"
+                >
+                  <div class="font-bold text-white">{{ charType }}</div>
+                  <div class="text-xs text-stone-400 mt-1">
+                    E:{{ CHARACTER_DEFAULTS[charType].energy }} S:{{ CHARACTER_DEFAULTS[charType].health }} T:0
+                  </div>
+                </button>
+              </div>
+              <p v-if="availableCharacterTypes.length === 0" class="text-stone-500 text-sm mt-2">
+                Tous les personnages sont deja dans la campagne
+              </p>
+            </div>
+
+            <!-- Player name -->
+            <div>
+              <label class="block text-sm font-medium text-stone-400 mb-2">Votre prenom *</label>
+              <input
+                  v-model="characterForm.playerName"
+                  type="text"
+                  class="w-full px-4 py-3 bg-stone-700 border border-stone-600 rounded-lg focus:border-amber-500 focus:outline-none"
+                  placeholder="Ex: Cyril"
+                  required
+              />
+            </div>
+
+            <!-- Actions -->
+            <div class="flex gap-3 pt-2">
+              <button
+                  type="button"
+                  @click="showCharacterModal = false"
+                  class="flex-1 px-6 py-3 bg-stone-700 hover:bg-stone-600 rounded-lg font-semibold transition-colors"
+              >
+                Annuler
+              </button>
+              <button
+                  type="submit"
+                  :disabled="!characterForm.characterType"
+                  class="flex-1 px-6 py-3 bg-amber-600 hover:bg-amber-500 disabled:bg-stone-600 disabled:cursor-not-allowed rounded-lg font-semibold transition-colors"
+              >
+                Ajouter
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- Delete Character Confirmation Modal -->
+    <Teleport to="body">
+      <div
+          v-if="deleteCharacterConfirm"
+          class="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4"
+          @click.self="deleteCharacterConfirm = null"
+      >
+        <div class="bg-stone-800 rounded-2xl w-full max-w-md p-6">
+          <h2 class="text-xl font-bold text-red-400 mb-4">Supprimer ce personnage ?</h2>
+          <p class="text-stone-300 mb-6">
+            Etes-vous sur de vouloir supprimer
+            <span class="font-semibold text-amber-400">{{ deleteCharacterConfirm.characterType }}</span>
+            ({{ deleteCharacterConfirm.playerName }}) ?
+          </p>
+          <div class="flex gap-3">
+            <button
+                @click="deleteCharacterConfirm = null"
+                class="flex-1 px-6 py-3 bg-stone-700 hover:bg-stone-600 rounded-lg font-semibold transition-colors"
+            >
+              Annuler
+            </button>
+            <button
+                @click="deleteCharacter"
                 class="flex-1 px-6 py-3 bg-red-600 hover:bg-red-500 rounded-lg font-semibold transition-colors"
             >
               Supprimer
