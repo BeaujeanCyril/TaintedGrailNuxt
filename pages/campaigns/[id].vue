@@ -78,6 +78,7 @@ const characterForm = ref({
   playerName: ''
 })
 const characterFormError = ref('')
+const charactersExpanded = ref(true)
 
 // Valeurs initiales par personnage
 const CHARACTER_DEFAULTS: Record<string, { energy: number; health: number }> = {
@@ -93,6 +94,23 @@ const AVAILABLE_CHARACTERS = ['Iunis', 'Gerdwyn', 'Elgan', 'Osbert']
 const showStatusModal = ref(false)
 const statuses = ref<StatusItem[]>([])
 const statusLoading = ref(false)
+const statusSearchQuery = ref('')
+
+// Statuts filtres par recherche intelligente
+const filteredStatuses = computed(() => {
+  if (!statusSearchQuery.value.trim()) {
+    return statuses.value
+  }
+  const query = statusSearchQuery.value.trim().toLowerCase()
+  // Recherche intelligente: supprime les accents pour la comparaison
+  const normalizeString = (str: string) => str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+  const normalizedQuery = normalizeString(query)
+
+  return statuses.value.filter((status: StatusItem) => {
+    const normalizedName = normalizeString(status.name)
+    return normalizedName.includes(normalizedQuery) || status.name.toLowerCase().includes(query)
+  })
+})
 
 // Personnages disponibles (non encore dans la campagne)
 const availableCharacterTypes = computed(() => {
@@ -347,6 +365,7 @@ function getCharacterColor(type: string) {
 
 async function openStatusModal() {
   showStatusModal.value = true
+  statusSearchQuery.value = ''
   await loadStatuses()
 }
 
@@ -446,38 +465,58 @@ onMounted(loadCampaign)
       </div>
 
       <template v-else-if="campaign">
-        <!-- Characters Section -->
-        <div class="mb-8">
-          <div class="flex items-center justify-between mb-4">
+        <!-- Characters Section (Accordion) -->
+        <div class="mb-8 bg-stone-800/40 rounded-xl border border-stone-700 overflow-hidden">
+          <!-- Accordion Header -->
+          <button
+              @click="charactersExpanded = !charactersExpanded"
+              class="w-full flex items-center justify-between p-4 hover:bg-stone-700/30 transition-colors"
+          >
             <h2 class="text-xl font-bold text-amber-400 flex items-center gap-2">
               <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
               </svg>
               Personnages ({{ campaign.characters.length }}/4)
             </h2>
-            <button
-                v-if="campaign.characters.length < 4"
-                @click="openCharacterModal"
-                class="px-4 py-2 bg-amber-600 hover:bg-amber-500 rounded-lg font-semibold transition-colors flex items-center gap-2 text-sm"
-            >
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+            <div class="flex items-center gap-3">
+              <button
+                  v-if="campaign.characters.length < 4"
+                  @click.stop="openCharacterModal"
+                  class="px-4 py-2 bg-amber-600 hover:bg-amber-500 rounded-lg font-semibold transition-colors flex items-center gap-2 text-sm"
+              >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                </svg>
+                Ajouter
+              </button>
+              <svg
+                  class="w-5 h-5 text-stone-400 transition-transform duration-200"
+                  :class="{ 'rotate-180': charactersExpanded }"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+              >
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
               </svg>
-              Ajouter
-            </button>
-          </div>
+            </div>
+          </button>
 
-          <!-- No characters -->
-          <div v-if="campaign.characters.length === 0" class="text-center py-8 bg-stone-800/40 rounded-xl border border-stone-700">
-            <p class="text-stone-400">Aucun personnage dans cette campagne</p>
-            <p class="text-stone-500 text-sm mt-1">Ajoutez jusqu'a 4 personnages</p>
-          </div>
+          <!-- Accordion Content -->
+          <div
+              v-show="charactersExpanded"
+              class="p-4 pt-0"
+          >
+            <!-- No characters -->
+            <div v-if="campaign.characters.length === 0" class="text-center py-8">
+              <p class="text-stone-400">Aucun personnage dans cette campagne</p>
+              <p class="text-stone-500 text-sm mt-1">Ajoutez jusqu'a 4 personnages</p>
+            </div>
 
-          <!-- Characters grid -->
-          <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div
-                v-for="char in campaign.characters"
-                :key="char.id"
+            <!-- Characters grid -->
+            <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div
+                  v-for="char in campaign.characters"
+                  :key="char.id"
                 class="relative bg-gradient-to-br rounded-xl p-4 border border-white/10"
                 :class="getCharacterColor(char.characterType)"
             >
@@ -563,6 +602,7 @@ onMounted(loadCampaign)
               </div>
             </div>
           </div>
+        </div>
         </div>
 
         <!-- Locations Section -->
@@ -1021,25 +1061,53 @@ onMounted(loadCampaign)
           class="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4"
           @click.self="showStatusModal = false"
       >
-        <div class="bg-stone-800 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-          <div class="p-6 border-b border-stone-700 flex items-center justify-between">
-            <h2 class="text-xl font-bold text-purple-400 flex items-center gap-2">
-              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
-              </svg>
-              Statuts de la campagne
-            </h2>
-            <button
-                @click="showStatusModal = false"
-                class="p-2 text-stone-400 hover:text-white hover:bg-stone-700 rounded-lg transition-colors"
-            >
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
+        <div class="bg-stone-800 rounded-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+          <!-- Header fixe -->
+          <div class="sticky top-0 bg-stone-800 rounded-t-2xl border-b border-stone-700 z-10">
+            <div class="p-6 flex items-center justify-between">
+              <h2 class="text-xl font-bold text-purple-400 flex items-center gap-2">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                </svg>
+                Statuts de la campagne
+              </h2>
+              <button
+                  @click="showStatusModal = false"
+                  class="p-2 text-stone-400 hover:text-white hover:bg-stone-700 rounded-lg transition-colors"
+              >
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <!-- Champ de recherche -->
+            <div class="px-6 pb-4">
+              <div class="relative">
+                <svg class="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-stone-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+                <input
+                    v-model="statusSearchQuery"
+                    type="text"
+                    placeholder="Rechercher un statut..."
+                    class="w-full pl-12 pr-4 py-3 bg-stone-700 border border-stone-600 rounded-lg focus:border-purple-500 focus:outline-none"
+                />
+                <button
+                    v-if="statusSearchQuery"
+                    @click="statusSearchQuery = ''"
+                    class="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-stone-400 hover:text-white"
+                >
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
           </div>
 
-          <div class="p-6">
+          <!-- Contenu scrollable -->
+          <div class="flex-1 overflow-y-auto p-6">
             <!-- Loading -->
             <div v-if="statusLoading" class="flex justify-center py-8">
               <svg class="animate-spin h-8 w-8 text-purple-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -1053,6 +1121,11 @@ onMounted(loadCampaign)
               Aucun statut disponible
             </div>
 
+            <!-- No results -->
+            <div v-else-if="filteredStatuses.length === 0" class="text-center py-8 text-stone-400">
+              Aucun statut trouve pour "{{ statusSearchQuery }}"
+            </div>
+
             <!-- Status table -->
             <table v-else class="w-full">
               <thead>
@@ -1063,7 +1136,7 @@ onMounted(loadCampaign)
               </thead>
               <tbody>
                 <tr
-                    v-for="status in statuses"
+                    v-for="status in filteredStatuses"
                     :key="status.id"
                     class="border-b border-stone-700/50 hover:bg-stone-700/30"
                 >
@@ -1093,6 +1166,11 @@ onMounted(loadCampaign)
                 </tr>
               </tbody>
             </table>
+
+            <!-- Compteur de resultats -->
+            <div v-if="!statusLoading && statuses.length > 0" class="mt-4 text-sm text-stone-500 text-center">
+              {{ filteredStatuses.length }} / {{ statuses.length }} statut(s)
+            </div>
           </div>
         </div>
       </div>

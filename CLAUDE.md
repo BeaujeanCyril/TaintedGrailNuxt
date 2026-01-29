@@ -4,15 +4,17 @@
 
 - **Serveur**: cyriongames.fr (IP: 37.59.120.247)
 - **Utilisateur SSH**: ubuntu
-- **Mot de passe SSH**: `CNuFyh9yvNsx`
+- **Mot de passe SSH**: `FT69rkqznj$$`
 - **Chemin sur le serveur**: `/home/ubuntu/apps/taintedgrail`
 - **Port de l'application**: 3004
 - **Process manager**: PM2 (nom: `taintedgrail`)
 
 ### Commande de déploiement
 ```bash
-cd /home/ubuntu/apps/taintedgrail && git pull && npm install && npx prisma generate && npx prisma db push && npm run build && pm2 restart taintedgrail
+cd /home/ubuntu/apps/taintedgrail && git pull && npm install && npx prisma generate && npx prisma db push && npm run build && ln -sf ../../public .output/server/chunks/public && pm2 restart taintedgrail
 ```
+
+**Note**: Le symlink `ln -sf ../../public .output/server/chunks/public` est nécessaire après chaque build pour que Nitro serve correctement les fichiers statiques.
 
 ## Base de données
 
