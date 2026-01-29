@@ -37,7 +37,9 @@ export default defineEventHandler(async (event) => {
       // Stats
       energy: body.energy ?? existing.energy,
       health: body.health ?? existing.health,
-      terror: body.terror ?? existing.terror
+      terror: body.terror ?? existing.terror,
+      // Position
+      locationNumber: body.locationNumber !== undefined ? body.locationNumber : existing.locationNumber
     }
   })
 
