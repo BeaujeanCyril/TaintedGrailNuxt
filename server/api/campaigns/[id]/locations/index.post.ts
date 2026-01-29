@@ -1,7 +1,7 @@
 import prisma from '~/server/utils/prisma'
 
 export default defineEventHandler(async (event) => {
-  const campaignId = parseInt(getRouterParam(event, 'campaignId') || '')
+  const campaignId = parseInt(getRouterParam(event, 'id') || '')
   const body = await readBody(event)
 
   if (isNaN(campaignId)) {

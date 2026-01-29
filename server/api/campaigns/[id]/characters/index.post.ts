@@ -11,7 +11,7 @@ const CHARACTER_DEFAULTS: Record<string, { energy: number; health: number }> = {
 const VALID_CHARACTERS = ['Iunis', 'Gerdwyn', 'Elgan', 'Osbert']
 
 export default defineEventHandler(async (event) => {
-  const campaignId = parseInt(getRouterParam(event, 'campaignId') || '')
+  const campaignId = parseInt(getRouterParam(event, 'id') || '')
   const body = await readBody(event)
 
   if (isNaN(campaignId)) {

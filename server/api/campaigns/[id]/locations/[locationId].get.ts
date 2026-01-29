@@ -1,10 +1,10 @@
 import prisma from '~/server/utils/prisma'
 
 export default defineEventHandler(async (event) => {
-  const campaignId = parseInt(getRouterParam(event, 'campaignId') || '')
-  const id = parseInt(getRouterParam(event, 'id') || '')
+  const campaignId = parseInt(getRouterParam(event, 'id') || '')
+  const locationId = parseInt(getRouterParam(event, 'locationId') || '')
 
-  if (isNaN(campaignId) || isNaN(id)) {
+  if (isNaN(campaignId) || isNaN(locationId)) {
     throw createError({
       statusCode: 400,
       statusMessage: 'ID invalide'
@@ -13,7 +13,7 @@ export default defineEventHandler(async (event) => {
 
   const location = await prisma.location.findFirst({
     where: {
-      id,
+      id: locationId,
       campaignId
     },
     include: {

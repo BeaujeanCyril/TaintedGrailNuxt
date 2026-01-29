@@ -1,10 +1,10 @@
 import prisma from '~/server/utils/prisma'
 
 export default defineEventHandler(async (event) => {
-  const campaignId = parseInt(getRouterParam(event, 'campaignId') || '')
-  const id = parseInt(getRouterParam(event, 'id') || '')
+  const campaignId = parseInt(getRouterParam(event, 'id') || '')
+  const locationId = parseInt(getRouterParam(event, 'locationId') || '')
 
-  if (isNaN(campaignId) || isNaN(id)) {
+  if (isNaN(campaignId) || isNaN(locationId)) {
     throw createError({
       statusCode: 400,
       statusMessage: 'ID invalide'
@@ -13,7 +13,7 @@ export default defineEventHandler(async (event) => {
 
   // Vérifier que le lieu existe et appartient à la campagne
   const existing = await prisma.location.findFirst({
-    where: { id, campaignId }
+    where: { id: locationId, campaignId }
   })
 
   if (!existing) {
@@ -24,7 +24,7 @@ export default defineEventHandler(async (event) => {
   }
 
   await prisma.location.delete({
-    where: { id }
+    where: { id: locationId }
   })
 
   return { success: true }

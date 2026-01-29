@@ -1,12 +1,11 @@
 import prisma from '~/server/utils/prisma'
 
 export default defineEventHandler(async (event) => {
-  const campaignId = parseInt(getRouterParam(event, 'campaignId') || '')
+  const campaignId = parseInt(getRouterParam(event, 'id') || '')
   const locationId = parseInt(getRouterParam(event, 'locationId') || '')
-  const id = parseInt(getRouterParam(event, 'id') || '')
   const body = await readBody(event)
 
-  if (isNaN(campaignId) || isNaN(locationId) || isNaN(id)) {
+  if (isNaN(campaignId) || isNaN(locationId)) {
     throw createError({
       statusCode: 400,
       statusMessage: 'ID invalide'
@@ -14,54 +13,51 @@ export default defineEventHandler(async (event) => {
   }
 
   // Vérifier que le lieu existe et appartient à la campagne
-  const location = await prisma.location.findFirst({
+  const existing = await prisma.location.findFirst({
     where: { id: locationId, campaignId }
   })
 
-  if (!location) {
+  if (!existing) {
     throw createError({
       statusCode: 404,
       statusMessage: 'Lieu non trouve'
     })
   }
 
-  // Vérifier que l'entrée existe
-  const existing = await prisma.entry.findFirst({
-    where: { id, locationId }
-  })
-
-  if (!existing) {
-    throw createError({
-      statusCode: 404,
-      statusMessage: 'Entree non trouvee'
-    })
-  }
-
   // Si le numéro change, vérifier qu'il n'existe pas déjà
   if (body.number !== undefined && body.number !== existing.number) {
-    const duplicate = await prisma.entry.findFirst({
+    const duplicate = await prisma.location.findFirst({
       where: {
-        locationId,
+        campaignId,
         number: body.number,
-        NOT: { id }
+        NOT: { id: locationId }
       }
     })
     if (duplicate) {
       throw createError({
         statusCode: 400,
-        statusMessage: 'Une entree avec ce numero existe deja pour ce lieu'
+        statusMessage: 'Un lieu avec ce numero existe deja dans cette campagne'
       })
     }
   }
 
-  const entry = await prisma.entry.update({
-    where: { id },
+  const location = await prisma.location.update({
+    where: { id: locationId },
     data: {
       number: body.number ?? existing.number,
-      info: body.info,
-      status: body.status ?? existing.status
+      name: body.name ?? existing.name,
+      dream: body.dream,
+      nightmare: body.nightmare,
+      hasMenhir: body.hasMenhir ?? existing.hasMenhir,
+      menhirNote: body.menhirNote,
+      notes: body.notes
+    },
+    include: {
+      entries: {
+        orderBy: { number: 'asc' }
+      }
     }
   })
 
-  return entry
+  return location
 })
