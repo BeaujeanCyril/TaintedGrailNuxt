@@ -1,4 +1,5 @@
 import prisma from '~/server/utils/prisma'
+import { broadcast } from '~/server/utils/wsHub'
 
 export default defineEventHandler(async (event) => {
   const campaignId = parseInt(getRouterParam(event, 'id') || '')
@@ -55,5 +56,6 @@ export default defineEventHandler(async (event) => {
     }
   })
 
+  broadcast(campaignId, { type: 'status.updated', data: campaignStatus })
   return campaignStatus
 })

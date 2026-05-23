@@ -1,4 +1,5 @@
 import prisma from '~/server/utils/prisma'
+import { broadcast } from '~/server/utils/wsHub'
 
 interface SaveCharacterInput {
   characterType: string
@@ -51,5 +52,6 @@ export default defineEventHandler(async (event) => {
     }
   })
 
+  broadcast(campaignId, { type: 'save.created', data: save })
   return save
 })

@@ -1,4 +1,5 @@
 import prisma from '~/server/utils/prisma'
+import { broadcast } from '~/server/utils/wsHub'
 
 export default defineEventHandler(async (event) => {
   const campaignId = parseInt(getRouterParam(event, 'id') as string)
@@ -37,5 +38,7 @@ export default defineEventHandler(async (event) => {
     })
   }
 
+  // Refetch full state pour broadcaster (les characters ont tous changé)
+  broadcast(campaignId, { type: 'save.restored', data: { saveId, name: save.name } })
   return { success: true, restoredFrom: save.name }
 })

@@ -3,6 +3,11 @@ export default defineNuxtConfig({
   compatibilityDate: '2025-01-07',
   devtools: { enabled: true },
   modules: ['@nuxtjs/tailwindcss'],
+  nitro: {
+    experimental: {
+      websocket: true
+    }
+  },
   app: {
     head: {
       title: 'Tainted Grail - Locations',

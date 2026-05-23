@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useCampaignSync } from '~/composables/useCampaignSync'
+
 interface Entry {
   id?: number
   number: number
@@ -553,7 +555,26 @@ function formatDate(dateStr: string) {
   })
 }
 
-onMounted(loadCampaign)
+// === Synchro WebSocket : refetch sur tout event entrant ===
+const sync = useCampaignSync(campaignId.value)
+const wsEvents = [
+  'campaign.updated',
+  'location.created', 'location.updated', 'location.deleted',
+  'entry.created', 'entry.updated', 'entry.deleted',
+  'character.created', 'character.updated', 'character.deleted',
+  'status.updated',
+  'save.created', 'save.deleted', 'save.restored'
+]
+
+onMounted(async () => {
+  await loadCampaign()
+  wsEvents.forEach(t => sync.on(t, () => loadCampaign()))
+  sync.connect()
+})
+
+onUnmounted(() => {
+  sync.disconnect()
+})
 </script>
 
 <template>

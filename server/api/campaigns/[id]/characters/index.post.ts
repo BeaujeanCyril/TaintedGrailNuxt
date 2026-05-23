@@ -1,4 +1,5 @@
 import prisma from '~/server/utils/prisma'
+import { broadcast } from '~/server/utils/wsHub'
 
 // Valeurs initiales par type de personnage
 const CHARACTER_DEFAULTS: Record<string, { energy: number; health: number }> = {
@@ -85,5 +86,6 @@ export default defineEventHandler(async (event) => {
     }
   })
 
+  broadcast(campaignId, { type: 'character.created', data: character })
   return character
 })

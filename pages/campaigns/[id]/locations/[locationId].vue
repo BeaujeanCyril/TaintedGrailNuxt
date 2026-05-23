@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useCampaignSync } from '~/composables/useCampaignSync'
+
 interface Entry {
   id: number
   number: number
@@ -161,7 +163,22 @@ function getStatusLabel(status: string | null) {
   }
 }
 
-onMounted(loadLocation)
+// === Synchro WebSocket : refetch sur events relatifs au lieu/entrées ===
+const sync = useCampaignSync(campaignId.value)
+const wsEvents = [
+  'location.updated', 'location.deleted',
+  'entry.created', 'entry.updated', 'entry.deleted'
+]
+
+onMounted(async () => {
+  await loadLocation()
+  wsEvents.forEach(t => sync.on(t, () => loadLocation()))
+  sync.connect()
+})
+
+onUnmounted(() => {
+  sync.disconnect()
+})
 </script>
 
 <template>
