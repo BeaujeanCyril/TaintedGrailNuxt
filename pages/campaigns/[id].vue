@@ -77,6 +77,8 @@ const campaign = ref<Campaign | null>(null)
 const loading = ref(true)
 const showModal = ref(false)
 const editingLocation = ref<Location | null>(null)
+const modalMode = ref<'create' | 'edit' | 'view'>('create')
+const isReadOnly = computed(() => modalMode.value === 'view')
 const deleteConfirm = ref<Location | null>(null)
 const searchQuery = ref('')
 
@@ -210,6 +212,7 @@ async function loadCampaign() {
 // Ouvrir le modal pour creer
 function openCreateModal() {
   editingLocation.value = null
+  modalMode.value = 'create'
   form.value = {
     number: 0,
     name: '',
@@ -224,9 +227,7 @@ function openCreateModal() {
   showModal.value = true
 }
 
-// Ouvrir le modal pour editer
-function openEditModal(location: Location, event: Event) {
-  event.stopPropagation()
+function fillFormFromLocation(location: Location) {
   editingLocation.value = location
   form.value = {
     number: location.number,
@@ -244,7 +245,26 @@ function openEditModal(location: Location, event: Event) {
     notes: location.notes || ''
   }
   formError.value = ''
+}
+
+// Ouvrir le modal en lecture
+function openViewModal(location: Location) {
+  modalMode.value = 'view'
+  fillFormFromLocation(location)
   showModal.value = true
+}
+
+// Ouvrir le modal pour editer
+function openEditModal(location: Location, event?: Event) {
+  if (event) event.stopPropagation()
+  modalMode.value = 'edit'
+  fillFormFromLocation(location)
+  showModal.value = true
+}
+
+// Basculer du mode "view" vers "edit" depuis l'intérieur du modal
+function switchToEditMode() {
+  if (editingLocation.value) modalMode.value = 'edit'
 }
 
 // Ajouter une entree au formulaire
@@ -643,6 +663,13 @@ onUnmounted(() => {
               </svg>
               Statuts
             </button>
+            <NuxtLink
+                :to="`/campaigns/${campaignId}/chapters`"
+                class="px-4 py-3 bg-yellow-700 hover:bg-yellow-600 rounded-lg font-semibold transition-colors flex items-center gap-2"
+            >
+              <span class="text-lg">🧀</span>
+              Chapitres
+            </NuxtLink>
             <button
                 @click="openCreateModal"
                 class="px-6 py-3 bg-amber-600 hover:bg-amber-500 rounded-lg font-semibold transition-colors flex items-center gap-2"
@@ -882,7 +909,7 @@ onUnmounted(() => {
                 v-for="location in filteredLocations"
                 :key="location.id"
                 class="border-t border-stone-700/50 hover:bg-stone-700/30 cursor-pointer group"
-                @click="goToLocation(location)"
+                @click="openViewModal(location)"
               >
                 <td class="py-2 px-3 font-bold text-amber-400">{{ location.number }}</td>
                 <td class="py-2 px-3 text-white">{{ location.name }}</td>
@@ -932,10 +959,22 @@ onUnmounted(() => {
           @click.self="showModal = false"
       >
         <div class="bg-stone-800 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-          <div class="p-6 border-b border-stone-700">
+          <div class="p-6 border-b border-stone-700 flex items-center justify-between gap-4">
             <h2 class="text-xl font-bold text-amber-400">
-              {{ editingLocation ? 'Modifier le lieu' : 'Nouveau lieu' }}
+              {{ modalMode === 'view' ? 'Détails du lieu' : (modalMode === 'edit' ? 'Modifier le lieu' : 'Nouveau lieu') }}
             </h2>
+            <div v-if="modalMode === 'view' && editingLocation" class="flex gap-2">
+              <NuxtLink
+                :to="`/campaigns/${campaignId}/locations/${editingLocation.id}`"
+                class="px-3 py-2 bg-stone-700 hover:bg-stone-600 rounded-lg text-sm transition-colors"
+                title="Gérer les entrées de ce lieu"
+              >📋 Entrées</NuxtLink>
+              <button
+                type="button"
+                class="px-3 py-2 bg-amber-600 hover:bg-amber-500 rounded-lg text-sm font-semibold transition-colors"
+                @click="switchToEditMode"
+              >✎ Modifier</button>
+            </div>
           </div>
 
           <form @submit.prevent="saveLocation" class="p-6 space-y-5">
@@ -952,7 +991,8 @@ onUnmounted(() => {
                     v-model.number="form.number"
                     type="number"
                     min="1"
-                    class="w-full px-4 py-3 bg-stone-700 border border-stone-600 rounded-lg focus:border-amber-500 focus:outline-none"
+                    :disabled="isReadOnly"
+                    class="w-full px-4 py-3 bg-stone-700 border border-stone-600 rounded-lg focus:border-amber-500 focus:outline-none disabled:opacity-70 disabled:cursor-default"
                     required
                 />
               </div>
@@ -961,7 +1001,8 @@ onUnmounted(() => {
                 <input
                     v-model="form.name"
                     type="text"
-                    class="w-full px-4 py-3 bg-stone-700 border border-stone-600 rounded-lg focus:border-amber-500 focus:outline-none"
+                    :disabled="isReadOnly"
+                    class="w-full px-4 py-3 bg-stone-700 border border-stone-600 rounded-lg focus:border-amber-500 focus:outline-none disabled:opacity-70 disabled:cursor-default"
                     placeholder="Nom du lieu"
                     required
                 />
@@ -975,7 +1016,8 @@ onUnmounted(() => {
                 <textarea
                     v-model="form.dream"
                     rows="2"
-                    class="w-full px-4 py-3 bg-blue-900/20 border border-blue-800 rounded-lg focus:border-blue-500 focus:outline-none resize-none"
+                    :disabled="isReadOnly"
+                    class="w-full px-4 py-3 bg-blue-900/20 border border-blue-800 rounded-lg focus:border-blue-500 focus:outline-none resize-none disabled:opacity-70 disabled:cursor-default"
                     placeholder="Information du reve..."
                 ></textarea>
               </div>
@@ -984,7 +1026,8 @@ onUnmounted(() => {
                 <textarea
                     v-model="form.nightmare"
                     rows="2"
-                    class="w-full px-4 py-3 bg-purple-900/20 border border-purple-800 rounded-lg focus:border-purple-500 focus:outline-none resize-none"
+                    :disabled="isReadOnly"
+                    class="w-full px-4 py-3 bg-purple-900/20 border border-purple-800 rounded-lg focus:border-purple-500 focus:outline-none resize-none disabled:opacity-70 disabled:cursor-default"
                     placeholder="Information du cauchemar..."
                 ></textarea>
               </div>
@@ -996,7 +1039,8 @@ onUnmounted(() => {
                 <input
                     v-model="form.hasMenhir"
                     type="checkbox"
-                    class="w-5 h-5 rounded text-emerald-600 bg-stone-700 border-stone-600"
+                    :disabled="isReadOnly"
+                    class="w-5 h-5 rounded text-emerald-600 bg-stone-700 border-stone-600 disabled:cursor-default"
                 />
                 <span>Presence d'un Menhir</span>
               </label>
@@ -1004,7 +1048,8 @@ onUnmounted(() => {
                 <input
                     v-model="form.menhirNote"
                     type="text"
-                    class="w-full px-4 py-3 bg-emerald-900/20 border border-emerald-800 rounded-lg focus:border-emerald-500 focus:outline-none"
+                    :disabled="isReadOnly"
+                    class="w-full px-4 py-3 bg-emerald-900/20 border border-emerald-800 rounded-lg focus:border-emerald-500 focus:outline-none disabled:opacity-70 disabled:cursor-default"
                     placeholder="Note sur le menhir..."
                 />
               </div>
@@ -1015,6 +1060,7 @@ onUnmounted(() => {
               <div class="flex items-center justify-between">
                 <label class="text-sm font-medium text-stone-400">Entrees</label>
                 <button
+                    v-if="!isReadOnly"
                     type="button"
                     @click="addEntry"
                     class="px-3 py-1 text-sm bg-stone-700 hover:bg-stone-600 rounded-lg transition-colors flex items-center gap-1"
@@ -1038,7 +1084,8 @@ onUnmounted(() => {
                         v-model.number="entry.number"
                         type="number"
                         min="1"
-                        class="w-full px-3 py-2 bg-stone-700 border border-stone-600 rounded-lg focus:border-amber-500 focus:outline-none text-sm"
+                        :disabled="isReadOnly"
+                        class="w-full px-3 py-2 bg-stone-700 border border-stone-600 rounded-lg focus:border-amber-500 focus:outline-none text-sm disabled:opacity-70 disabled:cursor-default"
                         placeholder="#"
                     />
                   </div>
@@ -1046,7 +1093,8 @@ onUnmounted(() => {
                     <label class="block text-xs text-stone-500 mb-1">Status</label>
                     <select
                         v-model="entry.status"
-                        class="w-full px-3 py-2 bg-stone-700 border border-stone-600 rounded-lg focus:border-amber-500 focus:outline-none text-sm"
+                        :disabled="isReadOnly"
+                        class="w-full px-3 py-2 bg-stone-700 border border-stone-600 rounded-lg focus:border-amber-500 focus:outline-none text-sm disabled:opacity-70 disabled:cursor-default"
                     >
                       <option :value="null">Non defini</option>
                       <option value="explored">Explore</option>
@@ -1055,6 +1103,7 @@ onUnmounted(() => {
                     </select>
                   </div>
                   <button
+                      v-if="!isReadOnly"
                       type="button"
                       @click="removeEntry(index)"
                       class="mt-5 p-2 text-red-400 hover:bg-red-900/30 rounded-lg transition-colors"
@@ -1070,7 +1119,8 @@ onUnmounted(() => {
                   <input
                       v-model="entry.info"
                       type="text"
-                      class="w-full px-3 py-2 bg-stone-700 border border-stone-600 rounded-lg focus:border-amber-500 focus:outline-none text-sm"
+                      :disabled="isReadOnly"
+                      class="w-full px-3 py-2 bg-stone-700 border border-stone-600 rounded-lg focus:border-amber-500 focus:outline-none text-sm disabled:opacity-70 disabled:cursor-default"
                       placeholder="Description de l'entree..."
                   />
                 </div>
@@ -1083,7 +1133,8 @@ onUnmounted(() => {
               <textarea
                   v-model="form.notes"
                   rows="3"
-                  class="w-full px-4 py-3 bg-stone-700 border border-stone-600 rounded-lg focus:border-amber-500 focus:outline-none resize-none"
+                  :disabled="isReadOnly"
+                  class="w-full px-4 py-3 bg-stone-700 border border-stone-600 rounded-lg focus:border-amber-500 focus:outline-none resize-none disabled:opacity-70 disabled:cursor-default"
                   placeholder="Notes sur ce lieu..."
               ></textarea>
             </div>
@@ -1095,13 +1146,14 @@ onUnmounted(() => {
                   @click="showModal = false"
                   class="flex-1 px-6 py-3 bg-stone-700 hover:bg-stone-600 rounded-lg font-semibold transition-colors"
               >
-                Annuler
+                {{ isReadOnly ? 'Fermer' : 'Annuler' }}
               </button>
               <button
+                  v-if="!isReadOnly"
                   type="submit"
                   class="flex-1 px-6 py-3 bg-amber-600 hover:bg-amber-500 rounded-lg font-semibold transition-colors"
               >
-                {{ editingLocation ? 'Modifier' : 'Creer' }}
+                {{ modalMode === 'edit' ? 'Modifier' : 'Creer' }}
               </button>
             </div>
           </form>

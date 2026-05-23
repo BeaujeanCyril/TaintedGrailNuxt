@@ -10,6 +10,9 @@ datasource db {
 model Campaign {
   id              Int              @id @default(autoincrement())
   name            String
+  // Progression des chapitres : 10 entiers (0-6) separes par virgule.
+  // Chaque entier = nombre de parts allumees sur un fromage decoupe en 6.
+  chapterSlices   String           @default("0,0,0,0,0,0,0,0,0,0")
   locations       Location[]
   characters      Character[]
   campaignStatuses CampaignStatus[]
