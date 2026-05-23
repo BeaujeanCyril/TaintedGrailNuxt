@@ -128,14 +128,15 @@ const newSaveName = ref('')
 const saveError = ref('')
 const deleteSaveConfirm = ref<Save | null>(null)
 
+// Normalisation : supprime accents + lowercase
+const normalizeString = (str: string) => str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+
 // Statuts filtres par recherche intelligente
 const filteredStatuses = computed(() => {
   if (!statusSearchQuery.value.trim()) {
     return statuses.value
   }
   const query = statusSearchQuery.value.trim().toLowerCase()
-  // Recherche intelligente: supprime les accents pour la comparaison
-  const normalizeString = (str: string) => str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
   const normalizedQuery = normalizeString(query)
 
   return statuses.value.filter((status: StatusItem) => {
@@ -143,6 +144,33 @@ const filteredStatuses = computed(() => {
     return normalizedName.includes(normalizedQuery) || status.name.toLowerCase().includes(query)
   })
 })
+
+// Alphabet pour navigation rapide dans la liste des statuts
+const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')
+
+function firstLetterNormalized(name: string): string {
+  return normalizeString(name).charAt(0).toUpperCase()
+}
+
+const availableStatusLetters = computed<Set<string>>(() => {
+  const set = new Set<string>()
+  for (const s of statuses.value) set.add(firstLetterNormalized(s.name))
+  return set
+})
+
+function scrollToStatusLetter(letter: string) {
+  if (!availableStatusLetters.value.has(letter)) return
+  // Si une recherche est active, on l'efface pour que la liste compl\u00e8te soit visible
+  if (statusSearchQuery.value) statusSearchQuery.value = ''
+  nextTick(() => {
+    const target = statuses.value.find((s: StatusItem) => firstLetterNormalized(s.name) === letter)
+    if (!target) return
+    const el = document.querySelector(`[data-status-id="${target.id}"]`)
+    if (el && typeof (el as HTMLElement).scrollIntoView === 'function') {
+      (el as HTMLElement).scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
+  })
+}
 
 // Personnages disponibles (non encore dans la campagne)
 const availableCharacterTypes = computed(() => {
@@ -837,82 +865,56 @@ onUnmounted(() => {
           <p class="text-stone-400 text-lg">Aucun lieu trouve pour "{{ searchQuery }}"</p>
         </div>
 
-        <!-- Locations Grid (clickable cards) -->
-        <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          <button
-              v-for="location in filteredLocations"
-              :key="location.id"
-              @click="goToLocation(location)"
-              class="group relative bg-stone-800/60 hover:bg-stone-700/60 border border-stone-700 hover:border-amber-500/50 rounded-xl p-5 text-left transition-all duration-200"
-          >
-            <!-- Actions -->
-            <div class="absolute top-3 right-3 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
-              <button
-                  @click="openEditModal(location, $event)"
-                  class="p-2 text-stone-400 hover:text-amber-400 hover:bg-stone-600 rounded-lg transition-colors"
-                  title="Modifier"
+        <!-- Locations Table -->
+        <div v-else class="overflow-x-auto bg-stone-800/40 border border-stone-700 rounded-xl">
+          <table class="w-full text-sm">
+            <thead class="bg-stone-800/80 text-stone-400">
+              <tr>
+                <th class="text-left py-2 px-3 font-medium w-16">#</th>
+                <th class="text-left py-2 px-3 font-medium">Nom du lieu</th>
+                <th class="text-center py-2 px-3 font-medium w-20">Rêve</th>
+                <th class="text-center py-2 px-3 font-medium w-20">Menhir</th>
+                <th class="text-right py-2 px-3 font-medium w-24"></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                v-for="location in filteredLocations"
+                :key="location.id"
+                class="border-t border-stone-700/50 hover:bg-stone-700/30 cursor-pointer group"
+                @click="goToLocation(location)"
               >
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                </svg>
-              </button>
-              <button
-                  @click="confirmDelete(location, $event)"
-                  class="p-2 text-stone-400 hover:text-red-400 hover:bg-stone-600 rounded-lg transition-colors"
-                  title="Supprimer"
-              >
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                </svg>
-              </button>
-            </div>
-
-            <!-- Number badge -->
-            <div class="flex items-start gap-3 mb-3">
-              <span class="px-3 py-1 bg-amber-600/30 text-amber-400 rounded-lg font-bold text-lg">
-                #{{ location.number }}
-              </span>
-            </div>
-
-            <!-- Name -->
-            <h3 class="text-lg font-semibold text-white group-hover:text-amber-400 transition-colors mb-3">
-              {{ location.name }}
-            </h3>
-
-            <!-- Indicators -->
-            <div class="flex flex-wrap gap-2 mb-3">
-              <span v-if="location.hasMenhir" class="px-2 py-1 bg-emerald-900/40 text-emerald-400 rounded text-xs flex items-center gap-1">
-                <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                  <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
-                </svg>
-                Menhir
-              </span>
-              <span v-if="location.dream" class="px-2 py-1 bg-blue-900/40 text-blue-400 rounded text-xs">
-                Reve
-              </span>
-              <span v-if="location.nightmare" class="px-2 py-1 bg-purple-900/40 text-purple-400 rounded text-xs">
-                Cauchemar
-              </span>
-            </div>
-
-            <!-- Entries count -->
-            <div class="flex items-center justify-between text-sm">
-              <span v-if="location.entries.length" class="text-stone-400">
-                {{ getExploredCount(location.entries) }}/{{ location.entries.length }} entrees explorees
-              </span>
-              <span v-else class="text-stone-500">Aucune entree</span>
-
-              <!-- Arrow -->
-              <svg class="w-5 h-5 text-stone-500 group-hover:text-amber-400 transform group-hover:translate-x-1 transition-all" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-              </svg>
-            </div>
-
-            <!-- Notes preview -->
-            <p v-if="location.notes" class="mt-2 text-xs text-stone-500 truncate">
-              {{ location.notes }}
-            </p>
-          </button>
+                <td class="py-2 px-3 font-bold text-amber-400">{{ location.number }}</td>
+                <td class="py-2 px-3 text-white">{{ location.name }}</td>
+                <td class="py-2 px-3 text-center">
+                  <span v-if="location.dream" class="text-blue-400" title="Texte de rêve renseigné">✓</span>
+                  <span v-else class="text-stone-600">—</span>
+                </td>
+                <td class="py-2 px-3 text-center">
+                  <span v-if="location.hasMenhir" class="text-emerald-400" title="Menhir">✓</span>
+                  <span v-else class="text-stone-600">—</span>
+                </td>
+                <td class="py-2 px-3 text-right">
+                  <div class="inline-flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button
+                      class="p-1.5 text-stone-400 hover:text-amber-400 hover:bg-stone-600 rounded transition-colors"
+                      title="Modifier"
+                      @click.stop="openEditModal(location, $event)"
+                    >
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                    </button>
+                    <button
+                      class="p-1.5 text-stone-400 hover:text-red-400 hover:bg-stone-600 rounded transition-colors"
+                      title="Supprimer"
+                      @click.stop="confirmDelete(location, $event)"
+                    >
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
 
         <!-- Stats -->
@@ -1274,6 +1276,23 @@ onUnmounted(() => {
               </button>
             </div>
 
+            <!-- Barre alphabet (navigation rapide) -->
+            <div class="px-6 pb-2">
+              <div class="flex flex-wrap gap-1">
+                <button
+                  v-for="letter in ALPHABET"
+                  :key="letter"
+                  type="button"
+                  :disabled="!availableStatusLetters.has(letter)"
+                  class="w-7 h-7 rounded text-xs font-semibold transition-colors"
+                  :class="availableStatusLetters.has(letter)
+                    ? 'bg-stone-700 hover:bg-purple-600 text-white cursor-pointer'
+                    : 'bg-stone-800 text-stone-600 cursor-not-allowed'"
+                  @click="scrollToStatusLetter(letter)"
+                >{{ letter }}</button>
+              </div>
+            </div>
+
             <!-- Champ de recherche -->
             <div class="px-6 pb-4">
               <div class="relative">
@@ -1331,7 +1350,8 @@ onUnmounted(() => {
                 <tr
                     v-for="status in filteredStatuses"
                     :key="status.id"
-                    class="border-b border-stone-700/50 hover:bg-stone-700/30"
+                    :data-status-id="status.id"
+                    class="border-b border-stone-700/50 hover:bg-stone-700/30 scroll-mt-4"
                 >
                   <td class="py-4 px-4">
                     <span class="font-medium text-white">{{ status.name }}</span>
