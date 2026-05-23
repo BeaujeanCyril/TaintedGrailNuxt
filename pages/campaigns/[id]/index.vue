@@ -899,8 +899,8 @@ onUnmounted(() => {
               <tr>
                 <th class="text-left py-2 px-3 font-medium w-16">#</th>
                 <th class="text-left py-2 px-3 font-medium">Nom du lieu</th>
-                <th class="text-center py-2 px-3 font-medium w-20">Rêve</th>
-                <th class="text-center py-2 px-3 font-medium w-20">Menhir</th>
+                <th class="text-center py-2 px-3 font-medium w-24">Rêve/Vision</th>
+                <th class="text-center py-2 px-3 font-medium w-24">Menhir/pierre</th>
                 <th class="text-right py-2 px-3 font-medium w-24"></th>
               </tr>
             </thead>
@@ -914,11 +914,11 @@ onUnmounted(() => {
                 <td class="py-2 px-3 font-bold text-amber-400">{{ location.number }}</td>
                 <td class="py-2 px-3 text-white">{{ location.name }}</td>
                 <td class="py-2 px-3 text-center">
-                  <span v-if="location.dream" class="text-blue-400" title="Texte de rêve renseigné">✓</span>
+                  <span v-if="location.dream" class="text-blue-400" title="Texte de Rêve/Vision renseigné">✓</span>
                   <span v-else class="text-stone-600">—</span>
                 </td>
                 <td class="py-2 px-3 text-center">
-                  <span v-if="location.hasMenhir" class="text-emerald-400" title="Menhir">✓</span>
+                  <span v-if="location.hasMenhir" class="text-emerald-400" title="Menhir/pierre">✓</span>
                   <span v-else class="text-stone-600">—</span>
                 </td>
                 <td class="py-2 px-3 text-right">
@@ -1012,13 +1012,13 @@ onUnmounted(() => {
             <!-- Dream / Nightmare -->
             <div class="grid grid-cols-2 gap-4">
               <div>
-                <label class="block text-sm font-medium text-blue-400 mb-2">Reve</label>
+                <label class="block text-sm font-medium text-blue-400 mb-2">Rêve/Vision</label>
                 <textarea
                     v-model="form.dream"
                     rows="2"
                     :disabled="isReadOnly"
                     class="w-full px-4 py-3 bg-blue-900/20 border border-blue-800 rounded-lg focus:border-blue-500 focus:outline-none resize-none disabled:opacity-70 disabled:cursor-default"
-                    placeholder="Information du reve..."
+                    placeholder="Information du Rêve/Vision..."
                 ></textarea>
               </div>
               <div>
@@ -1042,7 +1042,7 @@ onUnmounted(() => {
                     :disabled="isReadOnly"
                     class="w-5 h-5 rounded text-emerald-600 bg-stone-700 border-stone-600 disabled:cursor-default"
                 />
-                <span>Presence d'un Menhir</span>
+                <span>Présence d'un Menhir/pierre</span>
               </label>
               <div v-if="form.hasMenhir">
                 <input
@@ -1050,7 +1050,7 @@ onUnmounted(() => {
                     type="text"
                     :disabled="isReadOnly"
                     class="w-full px-4 py-3 bg-emerald-900/20 border border-emerald-800 rounded-lg focus:border-emerald-500 focus:outline-none disabled:opacity-70 disabled:cursor-default"
-                    placeholder="Note sur le menhir..."
+                    placeholder="Note sur le Menhir/pierre..."
                 />
               </div>
             </div>

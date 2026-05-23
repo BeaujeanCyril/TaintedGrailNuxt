@@ -211,10 +211,10 @@ onUnmounted(() => {
                 <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                   <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
                 </svg>
-                Menhir
+                Menhir/pierre
               </span>
               <span v-if="location.dream" class="px-3 py-1 bg-blue-900/50 text-blue-400 rounded-lg text-sm">
-                Reve disponible
+                Rêve/Vision disponible
               </span>
               <span v-if="location.nightmare" class="px-3 py-1 bg-purple-900/50 text-purple-400 rounded-lg text-sm">
                 Cauchemar disponible
@@ -246,7 +246,7 @@ onUnmounted(() => {
                   <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
                   </svg>
-                  Reve
+                  Rêve/Vision
                 </h3>
                 <p class="text-stone-300 whitespace-pre-wrap">{{ location.dream }}</p>
               </div>
@@ -268,10 +268,10 @@ onUnmounted(() => {
                 <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
                   <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
                 </svg>
-                Menhir present
+                Menhir/pierre présent
               </h3>
               <p v-if="location.menhirNote" class="text-stone-300">{{ location.menhirNote }}</p>
-              <p v-else class="text-stone-500 italic">Aucune note sur le menhir</p>
+              <p v-else class="text-stone-500 italic">Aucune note sur le Menhir/pierre</p>
             </div>
 
             <!-- Entries -->
