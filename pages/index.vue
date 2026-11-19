@@ -128,7 +128,7 @@ onMounted(loadCampaigns)
             <p class="text-stone-400 mt-1">Choisissez une campagne</p>
           </div>
           <a
-              href="https://portal.cyriongames.fr"
+              href="https://cyriongames.fr"
               class="px-4 py-2 text-sm text-stone-400 hover:text-white hover:bg-stone-700 rounded-lg transition-colors flex items-center gap-2"
           >
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
